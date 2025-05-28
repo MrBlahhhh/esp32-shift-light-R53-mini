@@ -6,10 +6,13 @@
 #define NUM_LEDS 8        // Number of LEDs in the strip
 #define LED_TYPE WS2812B
 #define COLOR_ORDER GRB
-#define SIMULATE_RPM      // Comment out to disable RPM simulation and use ESP-NOW
+//#define SIMULATE_RPM      // Comment out to disable RPM simulation and use ESP-NOW
+
+// Wi-Fi channel to match sender
+#define WIFI_CHANNEL 1
 
 CRGB leds[NUM_LEDS];
-uint32_t rpm = 0;         // Current RPM value
+uint16_t rpm = 0;         // Current RPM value
 bool redBlinkState = false;
 unsigned long lastBlinkTime = 0;
 const unsigned long blinkInterval = 100; // 100ms for 5Hz blink (on/off) at 7100+ RPM
@@ -24,12 +27,12 @@ void simulateRPM();
 
 void setup() {
   Serial.begin(115200);
-  
+ 
   // Initialize FastLED
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
   FastLED.setBrightness(75); // Brightness set to 75 (0-255)
 
-  #ifndef SIMULATE_RPM
+#ifndef SIMULATE_RPM
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
 
@@ -41,26 +44,31 @@ void setup() {
 
   // Register callback for received data
   esp_now_register_recv_cb(OnDataRecv);
-  #endif
+  Serial.println("ESP-Now receiver initialized");
+#endif
+
+  Serial.println("MAC Address: " + WiFi.macAddress());
 }
 
 void loop() {
-  #ifdef SIMULATE_RPM
+#ifdef SIMULATE_RPM
   simulateRPM();
-  #endif
+#endif
   updateLEDs();
   FastLED.show();
 }
 
 // ESP-NOW callback function
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
-  #ifndef SIMULATE_RPM
-  if (len == sizeof(uint32_t)) {
-    memcpy(&rpm, incomingData, sizeof(rpm));
+#ifndef SIMULATE_RPM
+  if (len == sizeof(uint16_t)) {
+    memcpy(&rpm, incomingData, sizeof(rpm)); // Update global rpm
     Serial.print("Received RPM: ");
     Serial.println(rpm);
+  } else {
+    Serial.println("Invalid data length received");
   }
-  #endif
+#endif
 }
 
 void updateLEDs() {
