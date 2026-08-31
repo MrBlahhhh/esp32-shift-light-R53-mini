@@ -1,128 +1,88 @@
-#include <esp_now.h>
-#include <WiFi.h>
-#include <FastLED.h>
+// R53 shift light — CAN-driven WS2812B strip with BLE configuration.
+//
+// One ESP32-C3 in the footwell reads RPM off the MINI's CAN bus, drives an
+// eight-LED strip, and serves a BLE service the Android app uses to set the
+// thresholds, colours and brightness, and to watch the bus.
+//
+// The strip works with no phone connected and no app running. Everything the
+// app does is configuration and observation; nothing on the BLE side is in the
+// path between CAN and the LEDs.
+//
+// Wiring and pin choices live in platformio.ini. The BLE wire format lives in
+// proto.h and is mirrored field-for-field by the app.
 
-#define LED_PIN 13        // Pin connected to WS2812B data line
-#define NUM_LEDS 8        // Number of LEDs in the strip
-#define LED_TYPE WS2812B
-#define COLOR_ORDER GRB
-//#define SIMULATE_RPM      // Comment out to disable RPM simulation and use ESP-NOW
+#include <Arduino.h>
+#include "proto.h"
+#include "settings.h"
+#include "canbus.h"
+#include "shiftlight.h"
+#include "blesvc.h"
 
-// Wi-Fi channel to match sender
-#define WIFI_CHANNEL 1
-
-CRGB leds[NUM_LEDS];
-uint16_t rpm = 0;         // Current RPM value
-bool redBlinkState = false;
-unsigned long lastBlinkTime = 0;
-const unsigned long blinkInterval = 100; // 100ms for 5Hz blink (on/off) at 7100+ RPM
-unsigned long lastSimTime = 0;
-const unsigned long simInterval = 100; // Update simulation every 100ms
-const unsigned long simPeriod = 10000; // 10-second cycle for RPM simulation
-
-// Function prototypes
-void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len);
-void updateLEDs();
-void simulateRPM();
+static uint32_t s_lastRender = 0;
+static uint32_t s_lastPrint  = 0;
 
 void setup() {
   Serial.begin(115200);
- 
-  // Initialize FastLED
-  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-  FastLED.setBrightness(75); // Brightness set to 75 (0-255)
+  delay(200);   // let USB CDC enumerate, or the boot lines go nowhere
 
-#ifndef SIMULATE_RPM
-  // Set device as a Wi-Fi Station
-  WiFi.mode(WIFI_STA);
+  Serial.println();
+  Serial.printf("R53 shift light — proto v%d\n", PROTO_VERSION);
 
-  // Init ESP-NOW
-  if (esp_now_init() != ESP_OK) {
-    Serial.println("Error initializing ESP-NOW");
-    return;
-  }
+  settingsBegin();
 
-  // Register callback for received data
-  esp_now_register_recv_cb(OnDataRecv);
-  Serial.println("ESP-Now receiver initialized");
+#ifdef SIMULATE_RPM
+  // The build flag wins at power-on so a board on the bench sweeps with no
+  // phone nearby. The app can still clear the flag afterwards.
+  cfg.flags |= SL_FLAG_SIMULATE;
+  Serial.println("SIMULATE_RPM compiled in — ignoring CAN for RPM");
 #endif
 
-  Serial.println("MAC Address: " + WiFi.macAddress());
+  // Order matters. Each of these claims an RMT channel, and a controller that
+  // fails to get one goes silently dead — no error, no log line, just a strip
+  // that never lights. The shift light is the point of the board, so it asks
+  // first and the status LED takes what is left.
+  shiftlightBegin();
+  statusBegin();
+
+  // Brought up even when simulating: the app's bus view is still worth having
+  // on a bench board, and a simulated RPM is flagged as such in telemetry so a
+  // log can never mistake it for a real reading.
+  canBegin();
+
+  bleBegin();
 }
 
 void loop() {
-#ifdef SIMULATE_RPM
-  simulateRPM();
-#endif
-  updateLEDs();
-  FastLED.show();
-}
+  uint32_t now = millis();
 
-// ESP-NOW callback function
-void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
-#ifndef SIMULATE_RPM
-  if (len == sizeof(uint16_t)) {
-    memcpy(&rpm, incomingData, sizeof(rpm)); // Update global rpm
-    Serial.print("Received RPM: ");
-    Serial.println(rpm);
-  } else {
-    Serial.println("Invalid data length received");
-  }
-#endif
-}
+  canPoll();
 
-void updateLEDs() {
-  CRGB color;
-  
-  // Calculate number of LED pairs to light (0 to 4 pairs)
-  int numPairs = constrain(map(rpm, 0, 7100, 0, 4), 0, 4);
-  
-  // Determine color based on RPM
-  if (rpm < 3000) {
-    color = CRGB(0, 0, 0); // Off below 3000 RPM
-  } else if (rpm < 6000) {
-    // Solid green from 3000 to 6000 RPM
-    color = CRGB(0, 255, 0);
-  } else if (rpm <= 7100) {
-    // Fade from green to red (6000 to 7100 RPM)
-    uint8_t t = map(rpm, 6000, 7100, 0, 255);
-    uint8_t red = t;
-    uint8_t green = 255 - t; // Scale green down (255 to 0)
-    color = CRGB(red, green, 0);
-  } else {
-    // Blink red at 7100+ RPM
-    if (millis() - lastBlinkTime >= blinkInterval) {
-      redBlinkState = !redBlinkState;
-      lastBlinkTime = millis();
-    }
-    color = redBlinkState ? CRGB(255, 0, 0) : CRGB(0, 0, 0);
-    numPairs = 4; // All LEDs blink at 7100+ RPM
+  bool simulating = cfg.flags & SL_FLAG_SIMULATE;
+  uint16_t rpm = simulating ? simulatedRpm() : canRpm();
+
+  // Feed the synthetic frame into the same ring the real bus fills, so the
+  // phone's CAN view shows 0x316 carrying exactly this RPM. It stays flagged as
+  // simulated in telemetry — a log must never be able to mistake it for the car.
+  if (simulating) canInjectSimulated(rpm);
+
+  if (now - s_lastRender >= (1000 / LED_HZ)) {
+    s_lastRender = now;
+    shiftlightRender(rpm);
+    statusUpdate(canUp(), bleConnected());
   }
 
-  // Set LEDs from ends to center based on numPairs
-  for (int i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CRGB(0, 0, 0); // Default to off
-    if (numPairs >= 1 && (i == 0 || i == 7)) leds[i] = color; // Pair 1: Ends
-    if (numPairs >= 2 && (i == 1 || i == 6)) leds[i] = color; // Pair 2
-    if (numPairs >= 3 && (i == 2 || i == 5)) leds[i] = color; // Pair 3
-    if (numPairs >= 4 && (i == 3 || i == 4)) leds[i] = color; // Pair 4: Center
-  }
-}
+  blePoll(rpm);
 
-void simulateRPM() {
-  unsigned long currentTime = millis();
-  if (currentTime - lastSimTime >= simInterval) {
-    // Calculate time within 10-second cycle
-    unsigned long cycleTime = currentTime % simPeriod;
-    if (cycleTime < simPeriod / 2) {
-      // Ramp up from 1000 to 8000 RPM (0 to 5000 ms)
-      rpm = 1000 + ((cycleTime * 7000) / (simPeriod / 2));
-    } else {
-      // Ramp down from 8000 to 1000 RPM (5000 to 10000 ms)
-      rpm = 8000 - (((cycleTime - simPeriod / 2) * 7000) / (simPeriod / 2));
-    }
-    Serial.print("Simulated RPM: ");
-    Serial.println(rpm);
-    lastSimTime = currentTime;
+  if (now - s_lastPrint >= 1000) {
+    s_lastPrint = now;
+    Serial.printf("rpm %4u%s  leds %u/%u  can %s %u f/s missed %u  ble %s%s\n",
+                  rpm, simulating ? " (sim)" : "",
+                  shiftlightLevel(), cfg.numLeds,
+                  canUp() ? "up" : "DOWN", canFramesPerSec(), canRxMissed(),
+                  bleConnected() ? "connected" : "advertising",
+                  settingsUnsaved() ? "  [unsaved]" : "");
   }
+
+  // Yield, or the idle task never runs and the watchdog eventually says so.
+  vTaskDelay(1 / portTICK_PERIOD_MS);
 }
