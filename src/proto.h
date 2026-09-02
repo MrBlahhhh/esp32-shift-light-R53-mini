@@ -82,6 +82,12 @@ struct __attribute__((packed)) CanFrameRec {
 static_assert(sizeof(CanFrameRec) == 17, "CanFrameRec must stay 17 bytes");
 
 #define SL_FRAME_EXT      0x80
+// Upper bound on a batch, not the batch size. The firmware caps each packet to
+// what the negotiated ATT MTU will actually carry, because a notify larger than
+// that is truncated rather than fragmented -- the count byte then describes more
+// records than arrived and the client throws the whole packet away. Android asks
+// for MTU 247 and gets all 13; iOS negotiates 185 and gets 10. Both are correct,
+// because pkt[0] carries the real count and every client sizes off it.
 #define SL_FRAMES_PER_PKT 13   // 1 + 13*17 = 222 bytes, inside a 244-byte MTU
 
 // --- Commands ---------------------------------------------------------------

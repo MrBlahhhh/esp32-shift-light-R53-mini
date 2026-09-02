@@ -11,6 +11,13 @@ static NimBLECharacteristic* s_telemetry = nullptr;
 static NimBLECharacteristic* s_canframe  = nullptr;
 static bool s_connected = false;
 
+// Negotiated ATT MTU for the current connection. 23 is the spec minimum and the
+// value in force until the exchange completes, which happens shortly after
+// connect -- so the first batch or two go out small and then the rest run full
+// size. Cached rather than queried per loop because getPeerMTU wants a
+// connection handle and this board only ever talks to one phone.
+static volatile uint16_t s_mtu = 23;
+
 // Deferred work from BLE callbacks. NimBLE runs these on its own host task, and
 // doing anything slow there — an NVS commit, a blocking LED flash — stalls the
 // stack and gets the connection dropped. The callback records the intent; the
@@ -22,7 +29,15 @@ static volatile bool s_wantReboot   = false;
 class ServerCallbacks : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer* /*s*/, NimBLEConnInfo& /*info*/) override {
     s_connected = true;
+    // Back to the floor: the previous connection's MTU says nothing about this
+    // one, and carrying a phone's 247 over to a client that never exchanges
+    // would size packets that client cannot receive.
+    s_mtu = 23;
     Serial.println("BLE: connected");
+  }
+  void onMTUChange(uint16_t mtu, NimBLEConnInfo& /*info*/) override {
+    s_mtu = mtu;
+    Serial.printf("BLE: MTU %u\n", (unsigned)mtu);
   }
   void onDisconnect(NimBLEServer* /*s*/, NimBLEConnInfo& /*info*/, int /*reason*/) override {
     s_connected = false;
@@ -186,8 +201,22 @@ void blePoll(uint16_t rpm) {
   // One batch per loop, not a drain-until-empty. A flood on the bus would
   // otherwise keep this function running until the ring emptied, and the strip
   // would visibly stutter while the phone caught up.
+  // Cap the batch to what this connection's MTU will carry. A notify is not
+  // fragmented: anything past ATT_MTU-3 is dropped on the floor, and since the
+  // count byte still claims the full batch the client discards the packet
+  // whole. That is the whole failure -- no error, no short read, just a CAN
+  // stream that silently never arrives.
+  //
+  // Android requests 247 and lands on 13, exactly what shipped before. iOS
+  // never offers more than 185 and lands on 10, which is why this exists:
+  // Web Bluetooth has no requestMtu, so it cannot be fixed from the app side.
+  uint16_t mtu = s_mtu < 23 ? 23 : s_mtu;
+  size_t maxRecs = (size_t)(mtu - 3 - 1) / sizeof(CanFrameRec);
+  if (maxRecs < 1) maxRecs = 1;
+  if (maxRecs > SL_FRAMES_PER_PKT) maxRecs = SL_FRAMES_PER_PKT;
+
   CanFrameRec recs[SL_FRAMES_PER_PKT];
-  size_t n = canDrainFrames(recs, SL_FRAMES_PER_PKT);
+  size_t n = canDrainFrames(recs, maxRecs);
   if (n > 0) {
     uint8_t pkt[1 + SL_FRAMES_PER_PKT * sizeof(CanFrameRec)];
     pkt[0] = (uint8_t)n;
