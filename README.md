@@ -1,6 +1,6 @@
 # R53 shift light — CAN, WS2812B, and a phone to set it up
 
-An ESP32-S3 in the footwell of a first-generation MINI Cooper S. It reads RPM off
+An ESP32 in the footwell of a first-generation MINI Cooper S. It reads RPM off
 the car's CAN bus, drives an eight-LED strip on the A-pillar, and serves a BLE
 service an Android app uses to set the thresholds, colours and brightness, and to
 watch the bus.
@@ -14,51 +14,86 @@ and the LEDs.
 
 ## Hardware
 
+The target is a **54 × 58 mm carrier board** with power, CAN, and GPIO4-direct
+strip drive on one PCB. An **ESP32-C3 SuperMini** is soldered flat in the middle;
+a D-SUN MP1584 buck module solders onto four through-holes on the top. Full
+mechanical detail, BOM, build notes, and the KiCad generation pipeline live
+in [`hardware/pcb/README.md`](hardware/pcb/README.md).
+
+| Part | Qty | Notes |
+|---|---:|---|
+| Carrier board (rev B) | 1 | generated in `hardware/pcb/` — 12 V in, CAN, strip out |
+| ESP32-C3 SuperMini | 1 | castellated module, USB-C at the top when face up |
+| D-SUN MP1584EN | 1 | solder-on buck, trim to 5.0 V before housing |
+| 8 × WS2812B strip | 1 | the shift light itself |
+
+The carrier replaces a dev board, a CAN breakout, a USB buck module, and the
+jumper-wire harness that was the first bring-up. That prototype still works and
+is still in the car today:
+
 | Part | Qty | Notes |
 |---|---:|---|
 | Waveshare ESP32-S3-Zero | 1 | ESP32-S3FH4R2 — 4 MB flash, 2 MB quad PSRAM |
 | SN65HVD230 CAN breakout | 1 | blue screw-terminal type |
-| 8 × WS2812B strip | 1 | the shift light itself |
+| 8 × WS2812B strip | 1 | same strip |
 
 ### Pin map
+
+Strip and CAN pins are identical on both boards. The carrier was laid out around
+this map rather than the other way round.
 
 | GPIO | Goes to |
 |---|---|
 | `4` | WS2812B data in |
 | `5` | SN65HVD230 `TXD` |
 | `6` | SN65HVD230 `RXD` |
-| `21` | onboard WS2812 — CAN/BLE status |
 
-`TXD` and `RXD` go **straight across, not crossed**. On the transceiver module
-`TXD` is an input the micro drives and `RXD` is an output. Swapping them is the
+Status LED differs by module:
+
+| Board | GPIO | LED type |
+|---|---|---|
+| Carrier (C3 SuperMini) | `8` | plain blue LED on the module, active low |
+| Prototype (S3-Zero) | `21` | addressable WS2812 on the module |
+
+`TXD` and `RXD` go **straight across, not crossed**. On the transceiver `TXD`
+is an input the micro drives and `RXD` is an output. Swapping them is the
 classic reason a freshly built CAN node hears nothing.
 
-GPIO19 and GPIO20 are the native USB pair on this board and are left alone.
+On the **C3 SuperMini**, component side up with USB-C at the top: the right edge
+(top → bottom) is 5V, GND, 3V3, IO4, IO3, IO2, IO1, IO0 and the left edge is
+IO5, IO6, IO7, IO8, IO9, IO10, IO20, IO21. IO4 is the strip, IO5 CAN TX, IO6
+CAN RX. IO8 and IO9 (BOOT) stay on the module.
 
-The onboard LED on the S3-Zero is an **addressable WS2812**, not a plain one, so
-it is driven as a one-pixel strip (`STATUS_LED_MODE=2`). Driving it with
-`digitalWrite`, as the older firmware in this family did, leaves it dark or stuck
-on whatever colour the first stray pulse happened to clock in.
+On the **S3-Zero**, GPIO19 and GPIO20 are the native USB pair and are left
+alone. The onboard LED is a WS2812, not a plain one, so it is driven as a
+one-pixel strip (`STATUS_LED_MODE=2`). Driving it with `digitalWrite` leaves it
+dark or stuck on whatever colour the first stray pulse happened to clock in.
 
-Status colours: green = CAN up, blue = CAN up and a phone connected, blinking red
-= CAN down.
+Status colours on both: green = CAN up, blue = CAN up and a phone connected,
+blinking red = CAN down.
 
 The node is **listen-only**. It is configured `TWAI_MODE_LISTEN_ONLY` and never
 drives a dominant bit, so it cannot acknowledge or disturb the car's bus.
 
 ## Firmware
 
-PlatformIO, one env:
+PlatformIO, two envs — one per module:
 
 ```sh
+# Carrier board (ESP32-C3 SuperMini)
+pio run -e esp32-c3 -t upload
+
+# Prototype (Waveshare ESP32-S3-Zero, still in the car)
 pio run -e esp32-s3-zero -t upload
+
 pio device monitor
 ```
 
 There is no stock `esp32-s3-fh4r2` board in the platform — the older repos in
 this family pointed at a community board JSON. `esp32-s3-devkitc1-n4r2` is the
 stock definition for the same silicon (N4 = 4 MB flash, R2 = 2 MB quad PSRAM),
-which is what the chip reports.
+which is what the chip reports. The C3 env uses `esp32-c3-devkitm-1`, which
+matches the SuperMini's pinout close enough.
 
 Every pin and toggle is a build flag in [`platformio.ini`](platformio.ini) —
 rewiring is an edit there, never to the source. Uncomment `-DSIMULATE_RPM` to
@@ -136,3 +171,4 @@ between a one-byte layout drift and a shift light that looks fine and is wrong.
 ## Related
 
 - [esp32-canbus-SN65HVD230-v2](https://github.com/MrBlahhhh/esp32-canbus-SN65HVD230-v2) — the CAN shift light this grew out of
+- [esp32-autosport](https://github.com/MrBlahhhh/esp32-autosport) — the PCB generation pipeline the carrier board came from
