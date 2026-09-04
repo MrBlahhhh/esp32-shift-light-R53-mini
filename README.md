@@ -1,7 +1,7 @@
 # R53 shift light — CAN, WS2812B, and a phone to set it up
 
-An ESP32 in the footwell of a first-generation MINI Cooper S. It reads RPM off
-the car's CAN bus, drives an eight-LED strip on the A-pillar, and serves a BLE
+An ESP32 behind the dash of a first-generation MINI Cooper S. It reads RPM off
+the car's CAN bus, drives an eight-LED strip on the steering column shroud, and serves a BLE
 service an Android app uses to set the thresholds, colours and brightness, and to
 watch the bus.
 
@@ -14,33 +14,31 @@ and the LEDs.
 
 ## Hardware
 
-The target is a **54 × 58 mm carrier board** with power, CAN, and GPIO4-direct
-strip drive on one PCB. An **ESP32-C3 SuperMini** is soldered flat in the middle;
-a D-SUN MP1584 buck module solders onto four through-holes on the top. Full
-mechanical detail, BOM, build notes, and the KiCad generation pipeline live
-in [`hardware/pcb/README.md`](hardware/pcb/README.md).
+Two builds, one firmware. The pin map below is identical on both.
 
-| Part | Qty | Notes |
-|---|---:|---|
-| Carrier board (rev B) | 1 | generated in `hardware/pcb/` — 12 V in, CAN, strip out |
-| ESP32-C3 SuperMini | 1 | castellated module, USB-C at the top when face up |
-| D-SUN MP1584EN | 1 | solder-on buck, trim to 5.0 V before housing |
-| 8 × WS2812B strip | 1 | the shift light itself |
-
-The carrier replaces a dev board, a CAN breakout, a USB buck module, and the
-jumper-wire harness that was the first bring-up. That prototype still works and
-is still in the car today:
+The **prototype** is loose parts, and it is the one still in the car:
 
 | Part | Qty | Notes |
 |---|---:|---|
 | Waveshare ESP32-S3-Zero | 1 | ESP32-S3FH4R2 — 4 MB flash, 2 MB quad PSRAM |
 | SN65HVD230 CAN breakout | 1 | blue screw-terminal type |
+| 8 × WS2812B strip | 1 | the shift light itself |
+
+There is also a **54 × 58 mm carrier board** that replaces the dev board, the CAN
+breakout, the buck module and the jumper-wire harness between them, with an
+**ESP32-C3 SuperMini** soldered flat in the middle and a D-SUN MP1584 buck on
+four through-holes at the top. **Its design files are not in this repo.**
+
+| Part | Qty | Notes |
+|---|---:|---|
+| Carrier board (rev B) | 1 | 12 V in, CAN, strip out |
+| ESP32-C3 SuperMini | 1 | castellated module, USB-C at the top when face up |
+| D-SUN MP1584EN | 1 | solder-on buck, trim to 5.0 V before housing |
 | 8 × WS2812B strip | 1 | same strip |
 
 ### Pin map
 
-Strip and CAN pins are identical on both boards. The carrier was laid out around
-this map rather than the other way round.
+Strip and CAN pins are identical on both boards.
 
 | GPIO | Goes to |
 |---|---|
@@ -171,4 +169,4 @@ between a one-byte layout drift and a shift light that looks fine and is wrong.
 ## Related
 
 - [esp32-canbus-SN65HVD230-v2](https://github.com/MrBlahhhh/esp32-canbus-SN65HVD230-v2) — the CAN shift light this grew out of
-- [esp32-autosport](https://github.com/MrBlahhhh/esp32-autosport) — the PCB generation pipeline the carrier board came from
+- [esp32-autosport](https://github.com/MrBlahhhh/esp32-autosport) — the PCB generation pipeline
