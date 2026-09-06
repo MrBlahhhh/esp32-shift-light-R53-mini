@@ -3,7 +3,8 @@
 An ESP32 behind the dash of a first-generation MINI Cooper S. It reads RPM off
 the car's CAN bus, drives an eight-LED strip on the steering column shroud, and serves a BLE
 service an Android app uses to set the thresholds, colours and brightness, and to
-watch the bus.
+watch the bus. It also serves [VTP/1](#vtp1) on the same connection, so a logger
+that speaks no shift light at all can still take the CAN bus off it.
 
 The strip works with no phone connected and no app running. Everything the app
 does is configuration and observation — nothing on the BLE side sits between CAN
@@ -165,6 +166,96 @@ how a bad threshold reaches the LEDs.
 
 Both ends pin these byte offsets in tests. They are the only thing standing
 between a one-byte layout drift and a shift light that looks fine and is wrong.
+
+## VTP/1
+
+The board serves a second GATT service:
+[VTP/1](https://github.com/Lapsmith-app/VTP), the open protocol for carrying
+CAN, GNSS and inertial data off a hand-built logger. Same connection, same
+board, nothing removed. This one carries the bus and only the bus — every byte
+that makes the thing a shift light is still on the service above, and an app
+that has never heard of VTP works exactly as it did.
+
+Capabilities are `can`, `control` and `masked_subscriptions`. There is no GNSS
+and no IMU here, so those bits are clear and their characteristics are *inert*
+rather than absent: §4.1 fixes the attribute table, because a central caches it
+across connections and a table that changes shape between them hands the next
+client a stale handle.
+
+| | |
+|---|---|
+| Service | `56545001-5f05-5b56-af87-dcab2baf2522` |
+| Subscription slots | 8, each `(id, mask)` over bits 0–29 |
+| Schedule slots | 24 `(subscription, identifier)` pairs |
+| Declared rate | 1000 frames/s |
+| Batch | one every 10 ms, sized to the negotiated MTU |
+| Clock | `esp_timer`, microseconds, monotonic from boot |
+
+Nothing streams until a client subscribes. `CAN_RESET` then `CAN_SUBSCRIBE` per
+identifier is the whole setup, and both stream and subscriptions die with the
+connection — a client always finds a known table and never inherits one it did
+not install.
+
+Two things are worth knowing before trusting a timestamp from this board. The
+arrival time is taken when the TWAI driver hands the frame over, not at
+end-of-frame on the wire, so it is later than §6.7 asks for by however long the
+frame sat in the rx queue. And the encoder is not written here: `lib/vtp1` is
+the reference encoder from the VTP repo, vendored unmodified, so a batch on the
+wire is byte for byte what the conformance corpus says a batch is.
+
+### Checking it
+
+The VTP repository ships a conformance harness that connects to a device and
+tests it against the specification — the control plane, `seq` starting at zero
+per connection, a frame matching two subscriptions being forwarded once, a
+re-install costing the client nothing:
+
+```sh
+cd ../VTP && uv run vtp1-harness
+```
+
+That, and not a successful build, is what says this firmware is conformant. It
+is also the first time VTP/1 has run on a microcontroller at all, so a failure
+is as likely to be a finding about the harness as about this board.
+
+### What it costs the shift light
+
+Nothing on the CAN path: the frame ring grew a second read cursor, so the two
+protocols each see every frame they subscribed to and neither consumes the
+other's.
+
+One thing did change on air. Two 128-bit service UUIDs will not fit in one
+advertisement — flags are 3 bytes and a UUID is 18 — so the primary packet
+keeps the shift light's UUID, byte for byte as before, and the scan response
+carries VTP's next to a **shortened** name, `R53-Shift`. The full
+`R53-ShiftLight` is still the GAP name once connected. Anything matching on the
+service UUID is untouched, which is every scan filter; anything matching the
+advertised name for an exact string is not.
+
+## Two generations of board
+
+Boards flashed before VTP was added are in cars and in customers' hands. They
+serve the one service, advertise the complete name, and have no VTP
+characteristics at all. One app talks to both generations, because nothing in
+the old protocol moved: same service UUID, same four characteristics, the config
+blob still 32 bytes and telemetry still 12, same opcodes.
+
+**`PROTO_VERSION` stays 1.** `settingsApply()` rejects a config blob whose
+version byte does not match, so bumping it makes every board already out there
+refuse every write the app sends. It is not a build number and must not be used
+as one.
+
+Three consequences worth having written down:
+
+- **Match on the service UUID, not the name.** That is the path both generations
+  share. The name fallback in the app now matches the older boards and not the
+  newer ones, which is the opposite way round to how it reads.
+- **There is no OTA.** A shipped board reaches VTP over USB-C and
+  `pio run -e esp32-c3 -t upload`, or not at all.
+- **A board cannot say what firmware it runs.** There is no build number in the
+  old protocol and no room to add one without changing a blob the app pins byte
+  offsets against. Whether the VTP service is present in the GATT table is the
+  only thing that distinguishes the two.
 
 ## Related
 

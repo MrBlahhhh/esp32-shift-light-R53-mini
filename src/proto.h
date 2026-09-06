@@ -22,6 +22,18 @@
 
 #define SL_DEVICE_NAME    "R53-ShiftLight"
 
+// What goes on air, as a SHORTENED local name (AD type 0x08). SL_DEVICE_NAME is
+// still the GAP name a client reads once connected; this is the one that has to
+// fit next to a second 128-bit service UUID.
+//
+// The arithmetic, because it is the whole reason: flags are 3 bytes and a
+// 128-bit UUID is 18, so the advertisement holds one UUID and has ten bytes
+// left. The scan response holds the other UUID and has thirteen, which is a
+// name AD of eleven characters. "R53-ShiftLight" is fourteen. Nothing about the
+// primary packet changed — the shift light's own UUID is still the thing a scan
+// filter matches, and that is the path every shipped app takes.
+#define SL_ADV_SHORT_NAME "R53-Shift"
+
 // --- Config -----------------------------------------------------------------
 // Written whole, never field-by-field: a partial write would leave the strip
 // running a mix of old and new thresholds, which looks like a firmware bug and

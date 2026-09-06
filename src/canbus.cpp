@@ -1,8 +1,10 @@
 #include "canbus.h"
 #include "settings.h"
+#include "vtpsvc.h"
 #include <Arduino.h>
 #include <driver/twai.h>
 #include <driver/gpio.h>
+#include <esp_timer.h>
 #include <string.h>
 
 // Overridable from platformio.ini so a rewire is a build flag, not a patch.
@@ -31,24 +33,48 @@ static size_t   s_filterCount   = 0;
 // wakes up late gets recent history rather than a gap, and deliberately
 // overwrites oldest-first: on a logger that cannot keep up, the newest frames
 // are the ones worth having.
+//
+// The cursors count frames rather than index slots — s_head is every frame ever
+// pushed, and a reader is behind by (s_head - tail). A cursor that has fallen
+// more than RING_SIZE behind has been overwritten, and it finds that out by
+// arithmetic at read time instead of the writer having to know who is reading.
+// That is what makes two independent readers cheap: the writer does not touch
+// either cursor.
+//
+// Everything here runs on the main loop task — canPoll() writes, the two BLE
+// services read, all from loop() — so none of it is synchronised and none of it
+// needs to be. Moving any of it to a task of its own is not a small change.
 #define RING_SIZE 128
-static CanFrameRec s_ring[RING_SIZE];
-static volatile size_t s_head = 0, s_tail = 0;
+static CapFrame s_ring[RING_SIZE];
+static uint64_t s_head = 0, s_tailLegacy = 0, s_tailVtp = 0;
+static uint16_t s_vtpDropped = 0;
 
-static void ringPush(const twai_message_t& m, uint32_t now) {
-  CanFrameRec r;
-  r.tsMs     = now;
-  r.id       = m.identifier;
-  r.dlcFlags = (uint8_t)(m.data_length_code & 0x0F);
-  if (m.extd) r.dlcFlags |= SL_FRAME_EXT;
+static uint16_t satAdd(uint16_t a, uint64_t b) {
+  uint64_t sum = (uint64_t)a + b;
+  return sum > 0xFFFF ? 0xFFFF : (uint16_t)sum;
+}
+
+// A cursor that has been overwritten is moved to the oldest frame still held.
+// For VTP those lost frames are the definition of §8.3's `dropped`: the device
+// accepted them — a subscription asked for them and its mode selected them —
+// and then discarded them because it could not keep up.
+static void catchUp(uint64_t& tail, uint16_t* dropped) {
+  if (s_head - tail <= RING_SIZE) return;
+  uint64_t lost = (s_head - RING_SIZE) - tail;
+  tail = s_head - RING_SIZE;
+  if (dropped) *dropped = satAdd(*dropped, lost);
+}
+
+static void ringPush(const twai_message_t& m, uint64_t tsUs, uint8_t want) {
+  CapFrame& r = s_ring[s_head % RING_SIZE];
+  r.tsUs = tsUs;
+  r.id   = m.identifier;
+  r.ext  = m.extd ? 1 : 0;
+  r.len  = m.data_length_code > 8 ? 8 : m.data_length_code;
+  r.want = want;
   memset(r.data, 0, sizeof(r.data));
-  uint8_t n = m.data_length_code > 8 ? 8 : m.data_length_code;
-  memcpy(r.data, m.data, n);
-
-  size_t next = (s_head + 1) % RING_SIZE;
-  if (next == s_tail) s_tail = (s_tail + 1) % RING_SIZE;  // drop oldest
-  s_ring[s_head] = r;
-  s_head = next;
+  memcpy(r.data, m.data, r.len);
+  s_head++;
 }
 
 static bool wanted(uint32_t id) {
@@ -56,6 +82,17 @@ static bool wanted(uint32_t id) {
   if (s_stream == SL_STREAM_ALL) return true;
   for (size_t i = 0; i < s_filterCount; i++) if (s_filter[i] == id) return true;
   return false;
+}
+
+// Both protocols get a say on every frame, and both are asked exactly once.
+// vtpAdmit() is not a predicate — it advances per-identifier schedule state — so
+// calling it twice, or skipping it because the old protocol already wants the
+// frame, would quietly corrupt a periodic subscription's timing.
+static uint8_t consumers(const twai_message_t& m, uint64_t tsUs) {
+  uint8_t want = 0;
+  if (wanted(m.identifier)) want |= CAN_WANT_LEGACY;
+  if (vtpAdmit(m.identifier, m.extd != 0, tsUs)) want |= CAN_WANT_VTP;
+  return want;
 }
 
 void canBegin() {
@@ -111,12 +148,25 @@ void canPoll() {
     if (twai_receive(&m, 0) != ESP_OK) break;
     s_frameCount++;
 
+    // Read the clock per frame, not per call: at 24 frames an iteration a
+    // shared stamp would file a whole batch under one instant and flatten the
+    // spacing VTP exists to carry.
+    //
+    // This is when the driver handed the frame over, which is later than the
+    // end-of-frame VTP §6.7 asks for by however long it sat in the rx queue.
+    // The gap is small and it is not zero; it is stated here rather than
+    // claimed away, because a client aligning below a millisecond is entitled
+    // to know that this device measures arrival at the software boundary.
+    uint64_t tsUs = (uint64_t)esp_timer_get_time();
+
     if (m.identifier == cfg.canRpmId && m.data_length_code >= 4) {
       uint16_t raw = (uint16_t)((m.data[3] << 8) | m.data[2]);
       s_rpm = (uint16_t)((raw * 10UL) / cfg.rpmScaleX10);
       s_lastRpmMs = now;
     }
-    if (wanted(m.identifier)) ringPush(m, now);
+
+    uint8_t want = consumers(m, tsUs);
+    if (want) ringPush(m, tsUs, want);
   }
 
   if (now - s_rateWindowMs >= 1000) {
@@ -138,12 +188,57 @@ uint16_t canFramesPerSec(){ return s_framesPerSec; }
 uint16_t canRxMissed()    { return s_rxMissed; }
 
 size_t canDrainFrames(CanFrameRec* out, size_t max) {
+  // No drop count on this side: the …0004 stream has never had a field to
+  // report one in, and inventing a behaviour change here would be a protocol
+  // change to the thing every shipped app already speaks.
+  catchUp(s_tailLegacy, nullptr);
   size_t n = 0;
-  while (n < max && s_tail != s_head) {
-    out[n++] = s_ring[s_tail];
-    s_tail = (s_tail + 1) % RING_SIZE;
+  while (n < max && s_tailLegacy != s_head) {
+    const CapFrame& c = s_ring[s_tailLegacy % RING_SIZE];
+    s_tailLegacy++;
+    if (!(c.want & CAN_WANT_LEGACY)) continue;   // captured for VTP, not for this
+    CanFrameRec& r = out[n++];
+    r.tsMs     = (uint32_t)(c.tsUs / 1000);
+    r.id       = c.id;
+    r.dlcFlags = (uint8_t)(c.len & 0x0F);
+    if (c.ext) r.dlcFlags |= SL_FRAME_EXT;
+    memcpy(r.data, c.data, sizeof(r.data));
   }
   return n;
+}
+
+// Skips whatever this cursor was not meant to see, and reports the overrun on
+// the way past.
+static bool vtpSeek() {
+  catchUp(s_tailVtp, &s_vtpDropped);
+  while (s_tailVtp != s_head && !(s_ring[s_tailVtp % RING_SIZE].want & CAN_WANT_VTP)) {
+    s_tailVtp++;
+  }
+  return s_tailVtp != s_head;
+}
+
+bool canVtpPeek(CapFrame* out) {
+  if (!vtpSeek()) return false;
+  *out = s_ring[s_tailVtp % RING_SIZE];
+  return true;
+}
+
+void canVtpPop() {
+  if (s_tailVtp != s_head) s_tailVtp++;
+}
+
+uint16_t canVtpTakeDropped() {
+  // Fold in the overrun before answering, or a batch sent on a quiet moment
+  // reports zero while frames are sitting overwritten behind the cursor.
+  catchUp(s_tailVtp, &s_vtpDropped);
+  uint16_t d = s_vtpDropped;
+  s_vtpDropped = 0;
+  return d;
+}
+
+void canVtpReset() {
+  s_tailVtp = s_head;
+  s_vtpDropped = 0;
 }
 
 void canInjectSimulated(uint16_t rpm) {
@@ -166,12 +261,14 @@ void canInjectSimulated(uint16_t rpm) {
   m.data[3] = (uint8_t)(raw >> 8);
 
   s_frameCount++;
-  if (wanted(m.identifier)) ringPush(m, now);
+  uint64_t tsUs = (uint64_t)esp_timer_get_time();
+  uint8_t want = consumers(m, tsUs);
+  if (want) ringPush(m, tsUs, want);
 }
 
 void canSetStream(uint8_t mode) {
   s_stream = mode;
-  if (mode == SL_STREAM_OFF) s_tail = s_head;  // drop the backlog, don't ship it late
+  if (mode == SL_STREAM_OFF) s_tailLegacy = s_head;  // drop the backlog, don't ship it late
 }
 
 void canSetFilter(const uint32_t* ids, size_t count) {
