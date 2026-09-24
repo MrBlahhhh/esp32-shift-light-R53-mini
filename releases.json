@@ -1,0 +1,149 @@
+{
+    "schema":  1,
+    "sourceRepo":  "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini",
+    "releases":  [
+                     {
+                         "build":  1,
+                         "date":  "2026-09-24",
+                         "bench":  false,
+                         "notes":  "Silent app handshake: changing settings needs Android app 1.2 or newer.",
+                         "sourceCommit":  "5574d9486a54309879c127d6f79e072b85beb30f",
+                         "boards":  {
+                                        "esp32-c3":  {
+                                                         "partitionTable":  {
+                                                                                "offset":  "0x8000",
+                                                                                "size":  3072,
+                                                                                "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b"
+                                                                            },
+                                                         "partitions":  {
+                                                                            "nvs":  "0x9000",
+                                                                            "otadata":  "0xe000",
+                                                                            "app0":  "0x10000",
+                                                                            "app1":  "0x1f0000",
+                                                                            "spiffs":  "0x3d0000",
+                                                                            "coredump":  "0x3f0000"
+                                                                        },
+                                                         "update":  [
+                                                                        {
+                                                                            "what":  "app",
+                                                                            "path":  "firmware/1/esp32-c3/shiftlight-esp32-c3-build1.bin",
+                                                                            "offset":  "0x10000",
+                                                                            "size":  703712,
+                                                                            "md5":  "e03b0f8eee1f2f3e6df34396c735d73f",
+                                                                            "sha256":  "e06e51010a6677ead0413f42d3069648d0f2b30d6d60ef4c87934bb65032a6ac"
+                                                                        },
+                                                                        {
+                                                                            "what":  "otadata",
+                                                                            "path":  "firmware/1/esp32-c3/boot_app0.bin",
+                                                                            "offset":  "0xe000",
+                                                                            "size":  8192,
+                                                                            "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                            "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                        }
+                                                                    ],
+                                                         "fresh":  [
+                                                                       {
+                                                                           "what":  "bootloader",
+                                                                           "path":  "firmware/1/esp32-c3/bootloader.bin",
+                                                                           "offset":  "0x0",
+                                                                           "size":  19520,
+                                                                           "md5":  "fa7a3a466caf4951feaa1638abe7c624",
+                                                                           "sha256":  "e6397e68487ada6e81a273c4b24966418ef6cbf389bae7801363c97ddcbdaeb9"
+                                                                       },
+                                                                       {
+                                                                           "what":  "partitions",
+                                                                           "path":  "firmware/1/esp32-c3/partitions.bin",
+                                                                           "offset":  "0x8000",
+                                                                           "size":  3072,
+                                                                           "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b",
+                                                                           "sha256":  "0a8b5720e7b77ff11f1462458c3a509dee79224e5279898f26d6a2e3ae0517b7"
+                                                                       },
+                                                                       {
+                                                                           "what":  "otadata",
+                                                                           "path":  "firmware/1/esp32-c3/boot_app0.bin",
+                                                                           "offset":  "0xe000",
+                                                                           "size":  8192,
+                                                                           "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                           "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                       },
+                                                                       {
+                                                                           "what":  "app",
+                                                                           "path":  "firmware/1/esp32-c3/shiftlight-esp32-c3-build1.bin",
+                                                                           "offset":  "0x10000",
+                                                                           "size":  703712,
+                                                                           "md5":  "e03b0f8eee1f2f3e6df34396c735d73f",
+                                                                           "sha256":  "e06e51010a6677ead0413f42d3069648d0f2b30d6d60ef4c87934bb65032a6ac"
+                                                                       }
+                                                                   ]
+                                                     },
+                                        "esp32-s3-zero":  {
+                                                              "partitionTable":  {
+                                                                                     "offset":  "0x8000",
+                                                                                     "size":  3072,
+                                                                                     "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b"
+                                                                                 },
+                                                              "partitions":  {
+                                                                                 "nvs":  "0x9000",
+                                                                                 "otadata":  "0xe000",
+                                                                                 "app0":  "0x10000",
+                                                                                 "app1":  "0x1f0000",
+                                                                                 "spiffs":  "0x3d0000",
+                                                                                 "coredump":  "0x3f0000"
+                                                                             },
+                                                              "update":  [
+                                                                             {
+                                                                                 "what":  "app",
+                                                                                 "path":  "firmware/1/esp32-s3-zero/shiftlight-esp32-s3-zero-build1.bin",
+                                                                                 "offset":  "0x10000",
+                                                                                 "size":  717744,
+                                                                                 "md5":  "636093ffef17c02413e0b7ce638d4d7b",
+                                                                                 "sha256":  "6b6beb10232f0c7175adcc4252563d36f0f16ff186ec1e5680f6f7ffdc3d5e9d"
+                                                                             },
+                                                                             {
+                                                                                 "what":  "otadata",
+                                                                                 "path":  "firmware/1/esp32-s3-zero/boot_app0.bin",
+                                                                                 "offset":  "0xe000",
+                                                                                 "size":  8192,
+                                                                                 "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                                 "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                             }
+                                                                         ],
+                                                              "fresh":  [
+                                                                            {
+                                                                                "what":  "bootloader",
+                                                                                "path":  "firmware/1/esp32-s3-zero/bootloader.bin",
+                                                                                "offset":  "0x0",
+                                                                                "size":  19984,
+                                                                                "md5":  "9bf7db5f88cc32351cf31e8c3a4dc325",
+                                                                                "sha256":  "670896258d62395f1986940214cc4a3223d1b05ab90f43666ec6a712639de516"
+                                                                            },
+                                                                            {
+                                                                                "what":  "partitions",
+                                                                                "path":  "firmware/1/esp32-s3-zero/partitions.bin",
+                                                                                "offset":  "0x8000",
+                                                                                "size":  3072,
+                                                                                "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b",
+                                                                                "sha256":  "0a8b5720e7b77ff11f1462458c3a509dee79224e5279898f26d6a2e3ae0517b7"
+                                                                            },
+                                                                            {
+                                                                                "what":  "otadata",
+                                                                                "path":  "firmware/1/esp32-s3-zero/boot_app0.bin",
+                                                                                "offset":  "0xe000",
+                                                                                "size":  8192,
+                                                                                "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                                "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                            },
+                                                                            {
+                                                                                "what":  "app",
+                                                                                "path":  "firmware/1/esp32-s3-zero/shiftlight-esp32-s3-zero-build1.bin",
+                                                                                "offset":  "0x10000",
+                                                                                "size":  717744,
+                                                                                "md5":  "636093ffef17c02413e0b7ce638d4d7b",
+                                                                                "sha256":  "6b6beb10232f0c7175adcc4252563d36f0f16ff186ec1e5680f6f7ffdc3d5e9d"
+                                                                            }
+                                                                        ]
+                                                          }
+                                    }
+                     }
+                 ]
+}

@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>R53 shift light flasher</title>
+  <meta name="description" content="Put the R53 shift light firmware on the carrier board (ESP32-C3 SuperMini) or the S3-Zero prototype from the browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800&family=Schibsted+Grotesk:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23132A1F'/%3E%3Ccircle cx='14' cy='32' r='6' fill='%232BF06A'/%3E%3Ccircle cx='32' cy='32' r='6' fill='%23FFB000'/%3E%3Ccircle cx='50' cy='32' r='6' fill='%23FF2E2E'/%3E%3C/svg%3E">
+</head>
+<body>
+  <div id="no-serial" class="banner banner-warn" hidden>
+    This browser can't talk to a USB serial port. Use Chrome or Edge on a Windows, Mac or Linux computer.
+  </div>
+  <div id="bench-banner" class="banner banner-danger" hidden>
+    Bench build: not from a published commit. For testing on our own boards only.
+  </div>
+
+  <main class="page">
+    <header class="header">
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <rect width="64" height="64" rx="14" fill="#132A1F"/>
+        <rect x="6" y="25" width="52" height="14" rx="7" fill="#08110C"/>
+        <circle cx="12" cy="32" r="3.4" fill="#2BF06A"/>
+        <circle cx="19.4" cy="32" r="3.4" fill="#2BF06A"/>
+        <circle cx="26.8" cy="32" r="3.4" fill="#2BF06A"/>
+        <circle cx="34.2" cy="32" r="3.4" fill="#FFB000"/>
+        <circle cx="41.6" cy="32" r="3.4" fill="#FFB000"/>
+        <circle cx="49" cy="32" r="3.4" fill="#FF2E2E"/>
+      </svg>
+      <div>
+        <h1>R53 shift light flasher</h1>
+        <p class="subtitle">Firmware for the shift light's carrier board and the S3-Zero prototype, straight from the browser.</p>
+      </div>
+    </header>
+
+    <section class="steps" aria-label="Flashing steps">
+      <article class="step" id="step-device">
+        <div class="step-head"><span class="step-num">1</span><h2>Board</h2></div>
+        <div class="step-body">
+          <p id="device-hint">Plug the board into the computer with a USB-C data cable and press Connect. The page reads the chip and works out which build it takes.</p>
+          <div class="picked" id="device-picked" hidden>
+            <span id="device-picked-art"></span>
+            <div>
+              <div class="name" id="device-picked-name"></div>
+              <div class="how" id="device-picked-how"></div>
+            </div>
+          </div>
+          <p class="chip-line" id="chip-line" hidden></p>
+          <p class="note" id="layout-line" hidden></p>
+          <p class="note note-bad" id="device-error" hidden></p>
+        </div>
+        <div class="step-actions">
+          <button class="btn btn-primary btn-wide" id="btn-connect" type="button">Connect</button>
+        </div>
+        <button class="btn-link" id="btn-manual" type="button">I know what this is</button>
+      </article>
+
+      <article class="step" id="step-firmware">
+        <div class="step-head"><span class="step-num">2</span><h2>Firmware</h2></div>
+        <div class="step-body">
+          <label for="release-select" class="note">Build</label>
+          <select class="select" id="release-select" disabled>
+            <option>Loading builds...</option>
+          </select>
+          <p class="note" id="release-detail"></p>
+          <p class="note" id="release-source"></p>
+        </div>
+      </article>
+
+      <article class="step" id="step-flash">
+        <div class="step-head"><span class="step-num">3</span><h2>Flash</h2></div>
+        <div class="step-body">
+          <p id="flash-hint">Pick a board and a build first.</p>
+        </div>
+        <div class="step-actions">
+          <button class="btn btn-primary btn-big" id="btn-flash" type="button" disabled>Flash</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="info">
+      <div class="card">
+        <h3>Which board</h3>
+        <p><strong>Carrier board.</strong> The shift light as it ships: a 54 &times; 58 mm board with an ESP32-C3 SuperMini soldered in the middle, USB-C at the top. Plug the cable into the SuperMini. A bare SuperMini on the bench takes the same build.</p>
+        <p><strong>Prototype.</strong> A Waveshare ESP32-S3-Zero wired to a CAN breakout and the strip. Plug into the S3-Zero's USB-C.</p>
+        <p>Either way the page reads the chip and picks the build itself. Flash it on the bench, disconnected from the car.</p>
+      </div>
+
+      <div class="card">
+        <h3>After flashing</h3>
+        <ol>
+          <li>The board restarts on its own. Away from the car, the status LED blinks: on the carrier board the blue LED on the SuperMini blinks once a second, on the S3-Zero it blinks red. That's "no CAN", which is what it should say on the bench.</li>
+          <li>Open the app and connect: the <a href="https://mrblahhhh.github.io/car/tech/2026/07/11/r53-esp32-shift-light.html#getting-the-app" target="_blank" rel="noopener">Android app</a>, or <a href="https://logs.geekopolis.com/shiftlight/" target="_blank" rel="noopener">logs.geekopolis.com/shiftlight</a> in Chrome (Bluefy on an iPhone). There's no pairing and no PIN.</li>
+          <li>After a fresh install it runs the default thresholds and colours. Set yours and press <strong>Save</strong>. An update keeps what was saved.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3>If it won't connect</h3>
+        <ul>
+          <li>Use a USB <strong>data</strong> cable. A lot of USB-C cables are charge-only and the board never shows up.</li>
+          <li>Close anything else holding the port: a serial monitor, PlatformIO, the Arduino IDE, another flasher tab.</li>
+          <li>Force the bootloader: hold <strong>BOOT</strong>, tap <strong>RST</strong> (RESET on the S3-Zero), let go of BOOT, then press Connect again. Plugging the cable in while holding BOOT does the same. On the carrier board both buttons are on the SuperMini, next to the USB-C.</li>
+          <li>No driver needed. Both boards use the chip's own USB. In the port list it's usually "USB JTAG/serial debug unit" or "USB Serial Device".</li>
+          <li>Chrome and Edge on a computer can do this. Firefox and Safari can't, and neither can a phone.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Source</h3>
+        <p>The firmware is on GitHub: <a href="https://github.com/MrBlahhhh/esp32-shift-light-R53-mini" target="_blank" rel="noopener">github.com/MrBlahhhh/esp32-shift-light-R53-mini</a>. Each build links the commit it was built from.</p>
+        <p>The shift light itself, the housing and the assembled version: <a href="https://ryansdesigns.geekopolis.com/shiftlight/" target="_blank" rel="noopener">ryansdesigns.geekopolis.com/shiftlight</a>.</p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>Every file is checked against its sha256 before anything is written, and read back by md5 after.</p>
+      <p>Flashing uses Espressif's <a href="https://github.com/espressif/esptool-js" target="_blank" rel="noopener">esptool-js</a> (Apache-2.0).</p>
+    </footer>
+  </main>
+
+  <dialog id="device-dialog" aria-labelledby="device-dialog-title">
+    <div class="modal-head">
+      <h2 id="device-dialog-title">Pick the board</h2>
+      <button class="modal-close" type="button" data-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="note">Only do this if the automatic check got it wrong or couldn't run. The page still checks the chip and its flash before writing anything.</p>
+      <div class="device-grid" id="device-grid"></div>
+    </div>
+  </dialog>
+
+  <dialog id="flash-dialog" aria-labelledby="flash-dialog-title">
+    <div class="modal-head">
+      <h2 id="flash-dialog-title">Flash</h2>
+      <button class="modal-close" type="button" data-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="flash-summary">
+        <span id="flash-art"></span>
+        <div id="flash-what"></div>
+      </div>
+
+      <div class="choices" id="flash-choices">
+        <label class="choice" id="choice-update">
+          <input type="radio" name="mode" value="update" checked>
+          <span>
+            <span class="title">Update</span>
+            <span class="desc" id="update-desc">Writes the new firmware only. Thresholds, colours and brightness you saved stay as they are.</span>
+          </span>
+        </label>
+        <label class="choice choice-danger">
+          <input type="radio" name="mode" value="fresh">
+          <span>
+            <span class="title">Fresh install: erases the board</span>
+            <span class="desc">Wipes the whole flash, saved settings included, and writes everything. What a new board needs. It starts on the default settings.</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="flash-go">
+        <button class="btn btn-primary btn-big" id="btn-start" type="button">Update now</button>
+        <button class="btn btn-primary btn-big" id="btn-next" type="button" hidden>Flash the next board</button>
+      </div>
+
+      <div class="progress-wrap" id="progress-wrap" hidden>
+        <div class="progress-label"><span id="progress-stage">Starting</span><span id="progress-pct"></span></div>
+        <div class="progress" id="progress"><div class="progress-bar" id="progress-bar"></div></div>
+      </div>
+
+      <div class="result" id="result" hidden></div>
+
+      <details class="log" id="log-details">
+        <summary>Serial log</summary>
+        <pre id="log"></pre>
+      </details>
+    </div>
+  </dialog>
+
+  <script type="module" src="flasher.js"></script>
+</body>
+</html>
