@@ -4,14 +4,15 @@
 #include "proto.h"
 
 // TWAI in listen-only mode. The R53's bus is a running car's bus and this board
-// has no business acknowledging frames on it, so the controller is configured
-// NO_ACK: it hears everything and never drives the dominant bit.
+// has no business acknowledging frames on it. Listen-only stops the ACK; the
+// IDF's listen-only errata fix, required at build time in canbus.cpp, stops the
+// error frames. Together the node never drives a dominant bit.
 
 void canBegin();
 void canPoll();          // drain the rx queue; call every loop
 uint16_t canRpm();       // decoded RPM, 0 once stale
 bool canRpmFresh();
-bool canUp();
+bool canUp();            // a frame heard inside CAN_SILENT_MS
 uint16_t canFramesPerSec();
 uint16_t canRxMissed();
 
@@ -50,7 +51,11 @@ uint16_t canVtpTakeDropped();         // accepted-then-discarded since last call
 void     canVtpReset();               // drop the backlog and the drop count
 
 // Synthesise the RPM frame while simulating, so the phone's bus view and its
-// RPM read-out agree with the strip instead of showing a dead bus.
+// RPM read-out agree with the strip. It goes to the app's stream only, never to
+// VTP, and does not count towards canUp().
 void canInjectSimulated(uint16_t rpm);
 
 #define RPM_STALE_MS 2000
+// A running R53 bus carries 0x316 alone at ~100 Hz, so half a second without
+// any frame is a dead or disconnected bus, not a quiet one.
+#define CAN_SILENT_MS 500

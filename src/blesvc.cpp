@@ -6,12 +6,14 @@
 #include "vtpsvc.h"
 #include <Arduino.h>
 #include <NimBLEDevice.h>
+#include <freertos/queue.h>
+#include <string.h>
 #include "vtp1_generated.h"   // VTP_SERVICE_UUID, for the scan response
 
 static NimBLECharacteristic* s_config    = nullptr;
 static NimBLECharacteristic* s_telemetry = nullptr;
 static NimBLECharacteristic* s_canframe  = nullptr;
-static bool s_connected = false;
+static volatile bool s_connected = false;
 
 // Negotiated ATT MTU for the current connection. 23 is the spec minimum and the
 // value in force until the exchange completes, which happens shortly after
@@ -20,13 +22,30 @@ static bool s_connected = false;
 // connection handle and this board only ever talks to one phone.
 static volatile uint16_t s_mtu = 23;
 
-// Deferred work from BLE callbacks. NimBLE runs these on its own host task, and
-// doing anything slow there — an NVS commit, a blocking LED flash — stalls the
-// stack and gets the connection dropped. The callback records the intent; the
-// main loop carries it out.
-static volatile bool s_wantSave     = false;
-static volatile bool s_wantIdentify = false;
-static volatile bool s_wantReboot   = false;
+// Writes from the phone. NimBLE runs callbacks on its own host task, on the
+// S3 the other core, while loop() renders from cfg and filters frames. So a
+// callback only copies the write into this queue and blePoll() applies it on
+// the loop, in the order it was sent. That also keeps an NVS commit or the
+// identify flash off the host task, where it would stall the stack and drop
+// the connection.
+enum : uint8_t { WRITE_CONFIG, WRITE_COMMAND };
+struct PhoneWrite {
+  uint8_t target;                        // WRITE_CONFIG or WRITE_COMMAND
+  uint8_t len;                           // clamped to sizeof(bytes)
+  uint8_t bytes[1 + SL_MAX_FILTER * 4];  // the longest write either accepts
+};
+static QueueHandle_t s_phoneWrites = nullptr;
+
+static void queueWrite(uint8_t target, const uint8_t* bytes, size_t len) {
+  if (!s_phoneWrites) return;
+  PhoneWrite w = {};
+  w.target = target;
+  w.len    = len > sizeof(w.bytes) ? sizeof(w.bytes) : (uint8_t)len;
+  memcpy(w.bytes, bytes, w.len);
+  if (xQueueSend(s_phoneWrites, &w, 0) != pdTRUE) {
+    Serial.println("BLE: write queue full, write dropped");
+  }
+}
 
 class ServerCallbacks : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer* s, NimBLEConnInfo& info) override {
@@ -64,10 +83,11 @@ class ServerCallbacks : public NimBLEServerCallbacks {
   }
   void onDisconnect(NimBLEServer* /*s*/, NimBLEConnInfo& /*info*/, int /*reason*/) override {
     s_connected = false;
-    // Streaming is per-connection state. Leaving it on would keep filling the
-    // ring for a phone that has gone, so the next client inherits a backlog of
-    // frames from someone else's session.
-    canSetStream(SL_STREAM_OFF);
+    // Streaming is per-connection state; left on, the next client inherits a
+    // backlog from someone else's session. Queued like the phone's own
+    // stream-off so it lands after anything that phone wrote before it left.
+    const uint8_t streamOff[] = { SL_CMD_STREAM, SL_STREAM_OFF };
+    queueWrite(WRITE_COMMAND, streamOff, sizeof(streamOff));
     vtpOnDisconnect();
     Serial.println("BLE: disconnected, advertising again");
     NimBLEDevice::startAdvertising();
@@ -77,70 +97,88 @@ class ServerCallbacks : public NimBLEServerCallbacks {
 class ConfigCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& /*info*/) override {
     NimBLEAttValue v = c->getValue();
-    if (!settingsApply(v.data(), v.size())) {
-      Serial.printf("BLE: config rejected (%u bytes)\n", (unsigned)v.size());
-      // Overwrite the attribute with what is actually running. A rejected write
-      // otherwise leaves the phone's value sitting in the characteristic, and
-      // the next read hands it back as though it had been accepted.
-      blePublishConfig();
-      return;
-    }
-    Serial.println("BLE: config applied (not yet saved)");
+    queueWrite(WRITE_CONFIG, v.data(), v.size());
   }
 };
 
 class CommandCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& /*info*/) override {
     NimBLEAttValue v = c->getValue();
-    if (v.size() < 1) return;
-    const uint8_t* p = v.data();
-
-    switch (p[0]) {
-      case SL_CMD_SAVE:
-        s_wantSave = true;
-        break;
-
-      case SL_CMD_DEFAULTS:
-        settingsDefaults();
-        blePublishConfig();
-        break;
-
-      case SL_CMD_STREAM:
-        if (v.size() >= 2) canSetStream(p[1]);
-        break;
-
-      case SL_CMD_FILTER: {
-        uint32_t ids[SL_MAX_FILTER];
-        size_t n = (v.size() - 1) / 4;
-        if (n > SL_MAX_FILTER) n = SL_MAX_FILTER;
-        for (size_t i = 0; i < n; i++) {
-          memcpy(&ids[i], p + 1 + i * 4, 4);
-        }
-        canSetFilter(ids, n);
-        break;
-      }
-
-      case SL_CMD_REBOOT:
-        s_wantReboot = true;
-        break;
-
-      case SL_CMD_IDENTIFY:
-        s_wantIdentify = true;
-        break;
-
-      default:
-        break;
-    }
+    queueWrite(WRITE_COMMAND, v.data(), v.size());
   }
 };
+
+// --- Phone writes, applied on the loop --------------------------------------
+
+static void applyConfig(const PhoneWrite& w) {
+  if (settingsApply(w.bytes, w.len)) {
+    Serial.println("BLE: config applied (not yet saved)");
+  } else {
+    Serial.printf("BLE: config rejected (%u bytes)\n", (unsigned)w.len);
+  }
+  // Either way the attribute now holds what is running. A rejected write would
+  // otherwise read back as though it had been accepted, and an accepted one
+  // may have had its blink period raised to the minimum.
+  blePublishConfig();
+}
+
+static void applyCommand(const PhoneWrite& w) {
+  if (w.len < 1) return;
+  const uint8_t* p = w.bytes;
+
+  switch (p[0]) {
+    case SL_CMD_SAVE:
+      Serial.println(settingsSave() ? "settings: saved" : "settings: SAVE FAILED");
+      blePublishConfig();
+      break;
+
+    case SL_CMD_DEFAULTS:
+      settingsDefaults();
+      blePublishConfig();
+      break;
+
+    case SL_CMD_STREAM:
+      if (w.len >= 2) canSetStream(p[1]);
+      break;
+
+    case SL_CMD_FILTER: {
+      uint32_t ids[SL_MAX_FILTER];
+      size_t n = (w.len - 1) / 4;
+      if (n > SL_MAX_FILTER) n = SL_MAX_FILTER;
+      for (size_t i = 0; i < n; i++) {
+        memcpy(&ids[i], p + 1 + i * 4, 4);
+      }
+      canSetFilter(ids, n);
+      break;
+    }
+
+    case SL_CMD_REBOOT:
+      Serial.println("rebooting on request");
+      delay(100);
+      ESP.restart();
+      break;
+
+    case SL_CMD_IDENTIFY:
+      shiftlightIdentify();
+      break;
+
+    default:
+      break;
+  }
+}
 
 void blePublishConfig() {
   if (s_config) s_config->setValue((uint8_t*)&cfg, sizeof(cfg));
 }
 
 void bleBegin() {
+  // Before init, so the queue exists before any callback can fire.
+  s_phoneWrites = xQueueCreate(8, sizeof(PhoneWrite));
+
   NimBLEDevice::init(SL_DEVICE_NAME);
-  NimBLEDevice::setPower(ESP_PWR_LVL_P9);
+  // +9 dBm. NimBLE 2.x takes dBm, not an esp_power_level_t: the old
+  // ESP_PWR_LVL_P9 is enum value 11, which it rounded up to +12 dBm.
+  NimBLEDevice::setPower(9);
   // The frame stream is the only thing here that needs a big MTU; at the
   // default 23 a full batch would fragment into ten packets and arrive slower
   // than the bus produces it.
@@ -207,21 +245,10 @@ void bleBegin() {
 bool bleConnected() { return s_connected; }
 
 void blePoll(uint16_t rpm) {
-  // Deferred callback work, on the main task where blocking is safe.
-  if (s_wantSave) {
-    s_wantSave = false;
-    Serial.println(settingsSave() ? "settings: saved" : "settings: SAVE FAILED");
-    blePublishConfig();
-  }
-  if (s_wantIdentify) {
-    s_wantIdentify = false;
-    shiftlightIdentify();
-  }
-  if (s_wantReboot) {
-    s_wantReboot = false;
-    Serial.println("rebooting on request");
-    delay(100);
-    ESP.restart();
+  PhoneWrite w;
+  while (s_phoneWrites && xQueueReceive(s_phoneWrites, &w, 0) == pdTRUE) {
+    if (w.target == WRITE_CONFIG) applyConfig(w);
+    else                          applyCommand(w);
   }
 
   // Before the return below, and gated on its own state: VTP's control plane

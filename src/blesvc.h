@@ -2,6 +2,8 @@
 #include <stdint.h>
 
 void bleBegin();
+// Applies the phone's queued writes (config, commands), then sends telemetry and
+// CAN batches. Call from loop() only: it is what keeps cfg single-writer.
 // `rpm` is the value actually driving the strip — simulated or off the bus.
 // Telemetry must report that, not canRpm(), or the app shows 0 while the
 // strip sweeps.

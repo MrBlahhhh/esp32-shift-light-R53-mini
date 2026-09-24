@@ -32,7 +32,8 @@ void setup() {
 
 #ifdef SIMULATE_RPM
   // The build flag wins at power-on so a board on the bench sweeps with no
-  // phone nearby. The app can still clear the flag afterwards.
+  // phone nearby. The app can still clear the flag afterwards, and a Save never
+  // writes it (settings.cpp masks it out).
   cfg.flags |= SL_FLAG_SIMULATE;
   Serial.println("SIMULATE_RPM compiled in — ignoring CAN for RPM");
 #endif
@@ -60,9 +61,9 @@ void loop() {
   bool simulating = cfg.flags & SL_FLAG_SIMULATE;
   uint16_t rpm = simulating ? simulatedRpm() : canRpm();
 
-  // Feed the synthetic frame into the same ring the real bus fills, so the
-  // phone's CAN view shows 0x316 carrying exactly this RPM. It stays flagged as
-  // simulated in telemetry — a log must never be able to mistake it for the car.
+  // Feed the synthetic frame into the app's stream in place of the car's, so its
+  // CAN view shows 0x316 carrying exactly this RPM. It stays flagged as
+  // simulated in telemetry and never reaches VTP, so no log can take it for the car.
   if (simulating) canInjectSimulated(rpm);
 
   if (now - s_lastRender >= (1000 / LED_HZ)) {

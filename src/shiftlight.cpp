@@ -3,8 +3,10 @@
 #include <Arduino.h>
 #include <FastLED.h>
 
+// From platformio.ini only. No fallback: on the carrier GPIO5 is the CAN
+// transceiver's TXD, and a guessed pin could clock LED data onto the car's bus.
 #ifndef LED_GPIO
-#define LED_GPIO 5
+#error "LED_GPIO is not defined; set it in platformio.ini"
 #endif
 #ifndef STATUS_LED_MODE
 #define STATUS_LED_MODE 0
@@ -13,14 +15,22 @@
 #define STATUS_LED_ACTIVE_LOW 0
 #endif
 // The S3-Zero's onboard pixel is RGB-ordered, unlike the GRB strip on LED_GPIO.
-// Get this wrong and red and green swap while blue looks perfect, because blue
-// is the last byte either way — which is a genuinely confusing thing to debug.
+// Get this wrong and red and green swap while blue looks right, because blue is
+// the last byte either way.
 #ifndef STATUS_LED_ORDER
 #define STATUS_LED_ORDER RGB
 #endif
 
-static CRGB    s_leds[SL_MAX_LEDS];
-static uint8_t s_level = 0;
+// Each threshold switches on exactly where it is set and back off only this far
+// below it, so a few rpm of jitter in 0x316 cannot flicker an LED step, the
+// colour change at rpmMid or the blink.
+#define SHIFT_HYSTERESIS_RPM 75
+#define RENDER_MS (1000 / LED_HZ)
+
+static CRGB     s_leds[SL_MAX_LEDS];
+static uint8_t  s_level        = 0;
+static uint16_t s_heldRpm      = 0;   // what the strip is drawn from
+static uint32_t s_blinkRenders = 0;   // renders since the blink started
 
 #if STATUS_LED_MODE == 2
 static CRGB s_status[1];
@@ -43,7 +53,20 @@ static inline CRGB blend8(const uint8_t a[3], const uint8_t b[3], uint8_t t) {
               a[2] + (((int)b[2] - a[2]) * t) / 255);
 }
 
-void shiftlightRender(uint16_t rpm) {
+// Follows the engine up at once and down only once it is SHIFT_HYSTERESIS_RPM
+// below, which puts the dead band under every threshold at once.
+static uint16_t holdRpm(uint16_t engineRpm) {
+  bool noReading = engineRpm == 0;   // canRpm() once stale: go dark now, not 75 rpm later
+  if (noReading || engineRpm >= s_heldRpm) {
+    s_heldRpm = engineRpm;
+  } else if (s_heldRpm - engineRpm > SHIFT_HYSTERESIS_RPM) {
+    s_heldRpm = engineRpm + SHIFT_HYSTERESIS_RPM;
+  }
+  return s_heldRpm;
+}
+
+void shiftlightRender(uint16_t engineRpm) {
+  uint16_t rpm = holdRpm(engineRpm);
   uint8_t n = cfg.numLeds > SL_MAX_LEDS ? SL_MAX_LEDS : cfg.numLeds;
   bool mirrored = cfg.flags & SL_FLAG_MIRRORED;
 
@@ -56,6 +79,7 @@ void shiftlightRender(uint16_t rpm) {
 
   if (!(cfg.flags & SL_FLAG_ENABLED) || slots == 0 || rpm < cfg.rpmStart) {
     s_level = 0;
+    s_blinkRenders = 0;
     FastLED.setBrightness(cfg.brightness);
     FastLED.show();
     return;
@@ -64,26 +88,38 @@ void shiftlightRender(uint16_t rpm) {
   CRGB color;
   uint8_t level;
 
+  // The divisions below are guarded even though valid() rejects zero spans and
+  // periods: an integer divide by zero is a panic on the S3.
   if (rpm >= cfg.rpmBlink) {
-    // Derived from the clock rather than a toggled flag: a missed render — and
-    // at 20 Hz alongside CAN and BLE there will be missed renders — then shows
-    // up as one skipped frame instead of inverting the blink from there on.
-    bool on = ((millis() / (cfg.blinkPeriodMs / 2)) & 1) == 0;
+    // Counted in renders, not read off millis(): the strip is only redrawn
+    // every RENDER_MS, and a clock phase sampled that coarsely aliases into an
+    // uneven blink. The period rounds to whole renders; each blink starts lit.
+    uint32_t rendersPerHalf = (cfg.blinkPeriodMs / 2 + RENDER_MS / 2) / RENDER_MS;
+    if (rendersPerHalf == 0) rendersPerHalf = 1;
+    bool on = (s_blinkRenders / rendersPerHalf) % 2 == 0;
+    s_blinkRenders++;
     color = on ? CRGB(cfg.colorBlink[0], cfg.colorBlink[1], cfg.colorBlink[2])
                : CRGB::Black;
     level = slots;
   } else {
-    uint16_t span = cfg.rpmRedline - cfg.rpmStart;   // valid() guarantees > 0
-    uint32_t up   = rpm - cfg.rpmStart;
-    level = 1 + (uint8_t)((up * (slots - 1)) / span);
-    if (level > slots) level = slots;
+    s_blinkRenders = 0;
+
+    if (rpm >= cfg.rpmRedline || cfg.rpmRedline <= cfg.rpmStart) {
+      level = slots;
+    } else {
+      uint32_t span = cfg.rpmRedline - cfg.rpmStart;
+      uint32_t up   = rpm - cfg.rpmStart;
+      level = (uint8_t)(1 + (up * (slots - 1)) / span);
+    }
 
     if (rpm < cfg.rpmMid) {
       color = CRGB(cfg.colorLow[0], cfg.colorLow[1], cfg.colorLow[2]);
     } else {
-      uint16_t cspan = cfg.rpmRedline - cfg.rpmMid;  // valid() guarantees > 0
-      uint32_t t = ((uint32_t)(rpm - cfg.rpmMid) * 255) / cspan;
-      color = blend8(cfg.colorMid, cfg.colorHigh, t > 255 ? 255 : (uint8_t)t);
+      uint8_t t = 255;
+      if (rpm < cfg.rpmRedline) {   // so rpmRedline > rpmMid and the span is not zero
+        t = (uint8_t)(((uint32_t)(rpm - cfg.rpmMid) * 255) / (cfg.rpmRedline - cfg.rpmMid));
+      }
+      color = blend8(cfg.colorMid, cfg.colorHigh, t);
     }
   }
 
@@ -116,10 +152,10 @@ void shiftlightIdentify() {
 }
 
 // --- Status indicator -------------------------------------------------------
-// Steady = CAN up. 1 Hz blink = CAN down, which is the fault worth seeing from
-// the driver's seat because it is indistinguishable from "engine off" until you
-// look. BLE state is shown only on the addressable variant, where it can have a
-// colour of its own instead of competing for the same blink pattern.
+// Steady = CAN up, meaning a frame heard in the last CAN_SILENT_MS. 1 Hz blink =
+// CAN down, which from the driver's seat looks like "engine off" until you
+// look. Dark = no power or no firmware running. BLE state is shown only on the
+// addressable variant, where it can have a colour of its own.
 
 void statusBegin() {
 #if STATUS_LED_MODE == 1
@@ -134,7 +170,7 @@ void statusBegin() {
 void statusUpdate(bool canOk, bool bleConnected) {
 #if STATUS_LED_MODE == 1
   (void)bleConnected;
-  bool on = canOk ? false : (((millis() / 500) & 1) == 0);
+  bool on = canOk || ((millis() / 500) & 1) == 0;   // lit while up, so dark means dead
   digitalWrite(STATUS_LED_PIN, (on != (bool)STATUS_LED_ACTIVE_LOW) ? HIGH : LOW);
 #elif STATUS_LED_MODE == 2
   // Near-full channel values on purpose. FastLED's master brightness is global

@@ -6,3 +6,6 @@
 
 # The companion Android app is kept out of this repo on purpose.
 android/
+
+# Made by a PlatformIO run that passed "~" through unexpanded.
+/~/

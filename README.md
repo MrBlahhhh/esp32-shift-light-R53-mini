@@ -68,11 +68,20 @@ alone. The onboard LED is a WS2812, not a plain one, so it is driven as a
 one-pixel strip (`STATUS_LED_MODE=2`). Driving it with `digitalWrite` leaves it
 dark or stuck on whatever colour the first stray pulse happened to clock in.
 
-Status colours on both: green = CAN up, blue = CAN up and a phone connected,
-blinking red = CAN down.
+The status LED shows whether CAN is up, and up means a frame heard in the last
+500 ms. The TWAI driver says it's running on a dead or unplugged bus, so its
+state isn't the test. On the S3-Zero: green = CAN up, blue = CAN up and a phone
+connected, blinking red = CAN down. On the C3's plain LED: steady = CAN up,
+1 Hz blink = CAN down, dark = no power or no firmware running. The app's "CAN
+down" uses the same 500 ms test.
 
-The node is **listen-only**. It is configured `TWAI_MODE_LISTEN_ONLY` and never
-drives a dominant bit, so it cannot acknowledge or disturb the car's bus.
+The node is **listen-only**, and that takes two things. `TWAI_MODE_LISTEN_ONLY`
+stops the ACK. But on the ESP32, S2, S3 and C3 the controller still sends
+dominant error frames in that mode unless the IDF was built with
+`CONFIG_TWAI_ERRATA_FIX_LISTEN_ONLY_DOM`, which holds it error-passive. With
+both, it never drives a dominant bit and can't acknowledge or disturb the car's
+bus. `canbus.cpp` refuses to compile without the option, which is why the
+platform is pinned (see [Firmware](#firmware)).
 
 ## Firmware
 
@@ -94,10 +103,22 @@ stock definition for the same silicon (N4 = 4 MB flash, R2 = 2 MB quad PSRAM),
 which is what the chip reports. The C3 env uses `esp32-c3-devkitm-1`, which
 matches the SuperMini's pinout close enough.
 
-Every pin and toggle is a build flag in [`platformio.ini`](platformio.ini) —
-rewiring is an edit there, never to the source. Uncomment `-DSIMULATE_RPM` to
-boot straight into an RPM sweep and ignore CAN, which is how you exercise a
-strip on the bench with no car attached.
+The platform is pinned to pioarduino
+[55.03.37](https://github.com/pioarduino/platform-espressif32/releases/tag/55.03.37)
+(Arduino core 3.3.7, IDF 5.5.2), whose prebuilt sdkconfig has the listen-only
+errata fix on. Don't put back a bare `platform = espressif32`: that resolves to
+whichever espressif32 platform is newest on the machine, and a clean machine
+gets the official 6.x line on IDF 4.4. Moving to a newer pioarduino release is
+safe for the bus as long as `canbus.cpp` still compiles, since it checks for
+the option.
+
+Every pin and toggle is a build flag in [`platformio.ini`](platformio.ini), so
+rewiring is an edit there, never to the source. There are no fallback pins: a
+build missing `LED_GPIO`, `CAN_TX_GPIO` or `CAN_RX_GPIO` stops with an error,
+because on the carrier GPIO5 is the transceiver's `TXD` and a guessed default
+could clock LED data onto the car's bus. Uncomment `-DSIMULATE_RPM` to boot
+straight into an RPM sweep and ignore CAN, which is how you exercise a strip on
+the bench with no car attached.
 
 `min_spiffs` is not optional: NimBLE plus the Arduino core plus FastLED does not
 fit the default 1.3 MB app partition, and the overflow surfaces as a link error
@@ -112,6 +133,18 @@ rather than a rebuild.
 A stale reading is reported as *no* reading. If RPM frames stop for two seconds
 the strip goes dark rather than holding whatever the engine was doing when the
 wire fell off.
+
+Every threshold has 75 rpm of hysteresis. An LED step, the colour change at
+`rpmMid` and the blink each switch on exactly at their set point and back off
+only 75 rpm below it, so jitter on `0x316` can't flicker the strip at a
+boundary.
+
+The blink is counted in renders (20 Hz), not read off the clock, which would
+alias against the render. The shortest period is 100 ms, one render on and one
+off, and any period is shown rounded to a multiple of 100 ms. A config asking
+for 40 to 99 ms, which older firmware and the current apps allow, runs at
+100 ms instead of being rejected, and a saved one is raised the same way at
+boot. `SL_BLINK_PERIOD_MIN_MS` in `proto.h` is the number for the apps to match.
 
 ## The app
 
@@ -142,6 +175,11 @@ The board reports which state it is in. Whenever the live config differs from
 what is in flash it sets `SL_TLM_UNSAVED` and the app says so. That includes
 first boot on a blank board, where the defaults are running but are not yet
 committed — telling you otherwise would lose your first edit.
+
+Simulate is the exception. The flag is live only: Save never writes it and it
+never makes the config count as unsaved, so a board can't end up booting into
+the sweep because someone saved while testing. While simulating, the frame
+stream carries the synthetic `0x316` in place of the car's.
 
 ## The wire format
 
@@ -202,6 +240,10 @@ end-of-frame on the wire, so it is later than §6.7 asks for by however long the
 frame sat in the rx queue. And the encoder is not written here: `lib/vtp1` is
 the reference encoder from the VTP repo, vendored unmodified, so a batch on the
 wire is byte for byte what the conformance corpus says a batch is.
+
+VTP only ever carries the real bus. VTP/1 has no way to flag a frame as
+synthetic, so the simulated `0x316` never reaches it, and a VTP client sees the
+car's own `0x316` even while the strip is sweeping.
 
 ### Checking it
 

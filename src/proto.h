@@ -48,7 +48,8 @@ struct __attribute__((packed)) ConfigBlob {
   uint16_t rpmMid;         // colour starts crossing from mid toward high
   uint16_t rpmRedline;     // bar full, colour fully at high
   uint16_t rpmBlink;       // whole strip blinks at and above this
-  uint16_t blinkPeriodMs;  // full on+off cycle, so 200 is the old 5 Hz blink
+  uint16_t blinkPeriodMs;  // full on+off cycle, so 200 is the old 5 Hz blink.
+                           // SL_BLINK_PERIOD_MIN_MS..5000; 40..99 runs at the minimum
   uint8_t  colorLow[3];    // R,G,B below rpmMid
   uint8_t  colorMid[3];    // R,G,B at rpmMid
   uint8_t  colorHigh[3];   // R,G,B at rpmRedline
@@ -60,7 +61,11 @@ static_assert(sizeof(ConfigBlob) == 32, "ConfigBlob must stay 32 bytes");
 
 #define SL_FLAG_ENABLED   0x01  // strip off entirely when clear
 #define SL_FLAG_MIRRORED  0x02  // fill in pairs from both ends inward
-#define SL_FLAG_SIMULATE  0x04  // sweep RPM instead of reading CAN
+#define SL_FLAG_SIMULATE  0x04  // sweep RPM instead of reading CAN; runtime only, never saved
+
+// One render on, one off at the 20 Hz render rate. Faster aliases against the
+// render, and the period is shown rounded to a multiple of 100 ms.
+#define SL_BLINK_PERIOD_MIN_MS 100
 
 // --- Telemetry --------------------------------------------------------------
 // Pushed at a fixed rate whether or not anything changed. A display that stops
@@ -76,7 +81,7 @@ struct __attribute__((packed)) TelemetryBlob {
 };
 static_assert(sizeof(TelemetryBlob) == 12, "TelemetryBlob must stay 12 bytes");
 
-#define SL_TLM_CAN_UP     0x01  // TWAI running, not bus-off or stopped
+#define SL_TLM_CAN_UP     0x01  // a frame heard in the last 500 ms (CAN_SILENT_MS)
 #define SL_TLM_RPM_FRESH  0x02  // an RPM frame arrived inside RPM_STALE_MS
 #define SL_TLM_SIMULATING 0x04  // rpm is synthetic — never log this as real
 #define SL_TLM_UNSAVED    0x08  // live config differs from what is in NVS

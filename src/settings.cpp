@@ -12,23 +12,30 @@ static ConfigBlob saved;   // last thing successfully written to NVS
 // green to 6000, green fading to red by 7100, then the whole strip blinking.
 // Anyone flashing this over the old firmware should see no change until they
 // open the app.
+static ConfigBlob defaultConfig() {
+  ConfigBlob d;
+  memset(&d, 0, sizeof(d));
+  d.version       = PROTO_VERSION;
+  d.numLeds       = 8;
+  d.brightness    = 75;
+  d.flags         = SL_FLAG_ENABLED | SL_FLAG_MIRRORED;
+  d.rpmStart      = 3500;
+  d.rpmMid        = 6000;
+  d.rpmRedline    = 7100;
+  d.rpmBlink      = 7100;
+  d.blinkPeriodMs = 200;
+  d.colorLow[0]   = 0;   d.colorLow[1]   = 255; d.colorLow[2]   = 0;
+  d.colorMid[0]   = 0;   d.colorMid[1]   = 255; d.colorMid[2]   = 0;
+  d.colorHigh[0]  = 255; d.colorHigh[1]  = 0;   d.colorHigh[2]  = 0;
+  d.colorBlink[0] = 255; d.colorBlink[1] = 0;   d.colorBlink[2] = 0;
+  d.canRpmId      = 0x316;
+  d.rpmScaleX10   = 64;   // raw / 6.4
+  return d;
+}
+
+// Built whole and then assigned, so the render never sees a half-reset config.
 void settingsDefaults() {
-  memset(&cfg, 0, sizeof(cfg));
-  cfg.version       = PROTO_VERSION;
-  cfg.numLeds       = 8;
-  cfg.brightness    = 75;
-  cfg.flags         = SL_FLAG_ENABLED | SL_FLAG_MIRRORED;
-  cfg.rpmStart      = 3500;
-  cfg.rpmMid        = 6000;
-  cfg.rpmRedline    = 7100;
-  cfg.rpmBlink      = 7100;
-  cfg.blinkPeriodMs = 200;
-  cfg.colorLow[0]   = 0;   cfg.colorLow[1]   = 255; cfg.colorLow[2]   = 0;
-  cfg.colorMid[0]   = 0;   cfg.colorMid[1]   = 255; cfg.colorMid[2]   = 0;
-  cfg.colorHigh[0]  = 255; cfg.colorHigh[1]  = 0;   cfg.colorHigh[2]  = 0;
-  cfg.colorBlink[0] = 255; cfg.colorBlink[1] = 0;   cfg.colorBlink[2] = 0;
-  cfg.canRpmId      = 0x316;
-  cfg.rpmScaleX10   = 64;   // raw / 6.4
+  cfg = defaultConfig();
 }
 
 // Rejects rather than clamps. A blob that fails these tests did not come from a
@@ -42,38 +49,63 @@ static bool valid(const ConfigBlob& c) {
   // span and the bar fills backwards.
   if (!(c.rpmStart < c.rpmMid && c.rpmMid < c.rpmRedline)) return false;
   if (c.rpmBlink < c.rpmMid)                   return false;
-  if (c.blinkPeriodMs < 40 || c.blinkPeriodMs > 5000) return false;
+  if (c.blinkPeriodMs < SL_BLINK_PERIOD_MIN_MS || c.blinkPeriodMs > 5000) return false;
   return true;
+}
+
+// The one repair. Firmware before SL_BLINK_PERIOD_MIN_MS accepted 40 ms, saved
+// configs may hold it and the shipped apps still offer it, so 40..99 runs at
+// the minimum instead of being rejected.
+static void raiseBlinkPeriod(ConfigBlob& c) {
+  if (c.blinkPeriodMs >= 40 && c.blinkPeriodMs < SL_BLINK_PERIOD_MIN_MS) {
+    c.blinkPeriodMs = SL_BLINK_PERIOD_MIN_MS;
+  }
+}
+
+// SL_FLAG_SIMULATE is runtime only: never written to NVS, and never the reason
+// the live config counts as unsaved.
+static ConfigBlob withoutSimulate(const ConfigBlob& c) {
+  ConfigBlob persisted = c;
+  persisted.flags &= ~SL_FLAG_SIMULATE;
+  return persisted;
 }
 
 bool settingsApply(const uint8_t* data, size_t len) {
   if (len != sizeof(ConfigBlob)) return false;
   ConfigBlob incoming;
   memcpy(&incoming, data, sizeof(incoming));
+  raiseBlinkPeriod(incoming);
   if (!valid(incoming)) return false;
   cfg = incoming;
   return true;
 }
 
 bool settingsUnsaved() {
-  return memcmp(&cfg, &saved, sizeof(cfg)) != 0;
+  ConfigBlob live = withoutSimulate(cfg);
+  return memcmp(&live, &saved, sizeof(live)) != 0;
 }
 
 bool settingsSave() {
+  ConfigBlob persisted = withoutSimulate(cfg);
   prefs.begin("shiftlight", false);
-  size_t n = prefs.putBytes("cfg", &cfg, sizeof(cfg));
+  size_t n = prefs.putBytes("cfg", &persisted, sizeof(persisted));
   prefs.end();
-  if (n != sizeof(cfg)) return false;
-  saved = cfg;
+  if (n != sizeof(persisted)) return false;
+  saved = persisted;
   return true;
 }
 
 void settingsBegin() {
   settingsDefaults();
   prefs.begin("shiftlight", true);
-  ConfigBlob stored;
+  ConfigBlob stored = {};
   size_t n = prefs.getBytes("cfg", &stored, sizeof(stored));
   prefs.end();
+
+  // Older firmware could save the simulate flag; a board must never boot into
+  // the sweep off the back of it.
+  stored = withoutSimulate(stored);
+  raiseBlinkPeriod(stored);
 
   // A stored blob from an older PROTO_VERSION fails valid() and is discarded in
   // favour of defaults. That is deliberate: this is a shift light, and losing

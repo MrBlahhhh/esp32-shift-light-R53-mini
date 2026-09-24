@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <esp_timer.h>
+#include <freertos/queue.h>
 #include <string.h>
 
 #include "vtp1_encode.h"
@@ -53,6 +54,8 @@ static NimBLECharacteristic* s_info    = nullptr;
 static NimBLECharacteristic* s_can     = nullptr;
 static NimBLECharacteristic* s_control = nullptr;
 
+// Everything in this file is loop-owned except s_indicateOutstanding, which
+// the host task clears in onStatus(). See "Events from the BLE host task".
 static bool     s_connected      = false;
 static bool     s_canSubscribed  = false;  // CCCD on the CAN stream
 static bool     s_ctlIndications = false;  // CCCD on Control, indications enabled
@@ -238,19 +241,18 @@ static void canReset() {
 
 // --- Control (§9) -----------------------------------------------------------
 //
-// A request is applied on the main loop, never in the BLE callback: applying it
-// there would run a table edit on NimBLE's host task while the CAN path reads
-// the same tables from loop(), and everything here is unsynchronised precisely
-// because it all runs in one place.
+// Received, applied and answered on the loop (see ctlReceive()), never in the
+// BLE callback, which would edit the tables on NimBLE's host task while the CAN
+// path reads them from loop().
+
+#define CTL_MAX_PARAMS 16
 
 struct CtlReq {
-  bool     used;
   uint8_t  op, tag;
-  uint8_t  p[16];
+  uint8_t  p[CTL_MAX_PARAMS];
   uint8_t  plen;
   uint64_t rxUs;    // §9.5: taken when the write arrived, not when it is answered
 };
-static CtlReq s_req;
 
 // Two slots. One holds the response being sent; the second is the room §9 says
 // a device must have to hold a response composed while an earlier indication is
@@ -265,15 +267,16 @@ struct CtlResp {
 static CtlResp s_resp[CTL_RESP_SLOTS];
 static uint8_t s_respHead  = 0;   // a queue, not two slots: a `busy` refusal
 static uint8_t s_respCount = 0;   // must not overtake the answer it refers to
-static bool    s_indicateOutstanding = false;
+static volatile bool s_indicateOutstanding = false;
 
 static bool respRoom() { return s_respCount < CTL_RESP_SLOTS; }
 
 // A response is owed from the moment its request is accepted until the device
-// has sent it (§9) — the send, not the confirmation, because that is where the
-// client's own boundary falls.
+// has sent it (§9): the send, not the confirmation, because that is where the
+// client's own boundary falls. A request is applied the moment it is accepted,
+// so an owed response is one still in the queue.
 static bool respOwed() {
-  return s_req.used || s_respCount > 0;
+  return s_respCount > 0;
 }
 
 static void respPush(uint8_t op, uint8_t tag, uint8_t status,
@@ -297,10 +300,7 @@ static void respPush(uint8_t op, uint8_t tag, uint8_t status,
   s_respCount++;
 }
 
-static void ctlApply() {
-  const CtlReq r = s_req;
-  s_req.used = false;
-
+static void ctlApply(const CtlReq& r) {
   switch (r.op) {
     case VTP_OP_CAN_RESET:
       if (r.plen != 0) { respPush(r.op, r.tag, VTP_STATUS_BAD_PARAMS, nullptr, 0); break; }
@@ -361,47 +361,69 @@ static void ctlApply() {
   }
 }
 
+// --- Events from the BLE host task ------------------------------------------
+//
+// NimBLE runs every callback on its own host task, on the S3 the other core. A
+// callback only queues what happened, and vtpPoll() applies the events on the
+// loop in arrival order. The tables, the ring cursor and the response queue
+// then have one writer, and each request is judged against the link state it
+// arrived into.
+
+enum VtpEventKind : uint8_t {
+  EV_CONNECT, EV_DISCONNECT, EV_MTU, EV_CAN_CCCD, EV_CONTROL_CCCD, EV_CONTROL_WRITE,
+};
+
+struct VtpEvent {
+  uint8_t  kind;
+  uint16_t value;                        // EV_MTU: the MTU; EV_*_CCCD: the CCCD bits
+  uint16_t len;                          // EV_CONTROL_WRITE: bytes written, may exceed sizeof(bytes)
+  uint64_t rxUs;                         // EV_CONTROL_WRITE: arrival (§9.5)
+  uint8_t  bytes[2 + CTL_MAX_PARAMS];    // opcode, tag, params
+};
+
+#define VTP_EVENT_SLOTS 16
+// Control writes may not take the last few slots, so a client flooding
+// requests while the loop is stalled cannot push out a link event behind them.
+#define VTP_EVENT_LINK_RESERVE 4
+
+static QueueHandle_t s_events = nullptr;
+
+static void postEvent(const VtpEvent& e) {
+  if (!s_events || xQueueSend(s_events, &e, 0) != pdTRUE) {
+    Serial.println("VTP: event queue full, event dropped");
+  }
+}
+
+static void postLinkEvent(uint8_t kind, uint16_t value) {
+  VtpEvent e = {};
+  e.kind  = kind;
+  e.value = value;
+  postEvent(e);
+}
+
 class ControlCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& /*info*/) override {
-    uint64_t rxUs = nowUs();   // §9.5 wants the arrival, not the composition
+    VtpEvent e = {};
+    e.kind = EV_CONTROL_WRITE;
+    e.rxUs = nowUs();   // §9.5 wants the arrival, not the composition
     NimBLEAttValue v = c->getValue();
-    if (v.size() < 2) return;  // not a request; there is no tag to answer with
-
-    // §9.4: deliverability is decided before dispatch. With indications off
-    // there is nowhere for the answer to go, so the request must not take
-    // effect and must not be counted as received.
-    if (!s_ctlIndications) return;
-
-    if (respOwed()) {
-      // The client has broken the one-outstanding rule. `busy` says nothing
-      // about the request itself, and the request is not applied. With no room
-      // to hold the refusal either, §9 says to discard it rather than apply
-      // something that cannot be answered — which respPush does by itself.
-      respPush(v.data()[0], v.data()[1], VTP_STATUS_BUSY, nullptr, 0);
-      return;
-    }
-
-    size_t plen = v.size() - 2;
-    if (plen > sizeof(s_req.p)) {
-      respPush(v.data()[0], v.data()[1], VTP_STATUS_BAD_PARAMS, nullptr, 0);
-      return;
-    }
-    s_req.op   = v.data()[0];
-    s_req.tag  = v.data()[1];
-    s_req.plen = (uint8_t)plen;
-    if (plen) memcpy(s_req.p, v.data() + 2, plen);
-    s_req.rxUs = rxUs;
-    s_req.used = true;
+    e.len = (uint16_t)v.size();
+    memcpy(e.bytes, v.data(), v.size() < sizeof(e.bytes) ? v.size() : sizeof(e.bytes));
+    // Past the reserve the request is discarded unanswered, as §9 allows when
+    // there is no room for it.
+    if (s_events && uxQueueSpacesAvailable(s_events) <= VTP_EVENT_LINK_RESERVE) return;
+    postEvent(e);
   }
 
   void onSubscribe(NimBLECharacteristic* /*c*/, NimBLEConnInfo& /*info*/,
                    uint16_t subValue) override {
-    s_ctlIndications = (subValue & 0x0002) != 0;
+    postLinkEvent(EV_CONTROL_CCCD, subValue);
   }
 
   void onStatus(NimBLECharacteristic* /*c*/, NimBLEConnInfo& /*info*/, int /*code*/) override {
-    // Called once an indication is resolved — confirmed, or failed. Either way
-    // the link is free to carry the next one.
+    // Called once an indication is resolved, confirmed or failed. Either way
+    // the link is free to carry the next one. Written here directly: it is one
+    // flag, and a queued clear could land after the next indication had gone.
     s_indicateOutstanding = false;
   }
 };
@@ -409,11 +431,46 @@ class ControlCallbacks : public NimBLECharacteristicCallbacks {
 class CanStreamCallbacks : public NimBLECharacteristicCallbacks {
   void onSubscribe(NimBLECharacteristic* /*c*/, NimBLEConnInfo& /*info*/,
                    uint16_t subValue) override {
-    bool on = (subValue & 0x0001) != 0;
-    if (on && !s_canSubscribed) canVtpReset();   // no backlog from before the client asked
-    s_canSubscribed = on;
+    postLinkEvent(EV_CAN_CCCD, subValue);
   }
 };
+
+// One Control write, on the loop. Everything §9 decides at arrival is decided
+// here, in arrival order.
+static void ctlReceive(const VtpEvent& e) {
+  if (e.len < 2) return;  // not a request; there is no tag to answer with
+
+  // §9.4: deliverability is decided before dispatch. With indications off
+  // there is nowhere for the answer to go, so the request must not take
+  // effect and must not be counted as received.
+  if (!s_ctlIndications) return;
+
+  uint8_t op  = e.bytes[0];
+  uint8_t tag = e.bytes[1];
+
+  if (respOwed()) {
+    // The client has broken the one-outstanding rule. `busy` says nothing
+    // about the request itself, and the request is not applied. With no room
+    // to hold the refusal either, §9 says to discard it rather than apply
+    // something that cannot be answered, which respPush does by itself.
+    respPush(op, tag, VTP_STATUS_BUSY, nullptr, 0);
+    return;
+  }
+
+  size_t plen = e.len - 2;
+  if (plen > CTL_MAX_PARAMS) {
+    respPush(op, tag, VTP_STATUS_BAD_PARAMS, nullptr, 0);
+    return;
+  }
+
+  CtlReq r = {};
+  r.op   = op;
+  r.tag  = tag;
+  r.plen = (uint8_t)plen;
+  if (plen) memcpy(r.p, e.bytes + 2, plen);
+  r.rxUs = e.rxUs;
+  ctlApply(r);   // nothing was owed, so the response queue has room
+}
 
 // The inert streams. §4.1 requires a device to accept a CCCD write on a stream
 // whose capability bit is clear and then simply never notify, rather than
@@ -508,7 +565,7 @@ static void canFlush() {
 
 // --- Link lifecycle ---------------------------------------------------------
 
-void vtpOnConnect() {
+static void linkUp() {
   s_connected      = true;
   s_canSubscribed  = false;
   s_ctlIndications = false;
@@ -520,13 +577,12 @@ void vtpOnConnect() {
   s_canSeq = 0;
   s_shed   = 0;
   s_indicateOutstanding = false;
-  s_req.used   = false;
   s_respHead   = 0;
   s_respCount  = 0;
   canReset();
 }
 
-void vtpOnDisconnect() {
+static void linkDown() {
   s_connected      = false;
   s_canSubscribed  = false;
   s_ctlIndications = false;
@@ -535,12 +591,46 @@ void vtpOnDisconnect() {
   canReset();
 }
 
-void vtpSetMtu(uint16_t mtu) {
-  s_mtu = mtu;
-  s_mtuWarned = false;
+// Called from blesvc.cpp's server callbacks, on the host task.
+void vtpOnConnect()          { postLinkEvent(EV_CONNECT, 0); }
+void vtpOnDisconnect()       { postLinkEvent(EV_DISCONNECT, 0); }
+void vtpSetMtu(uint16_t mtu) { postLinkEvent(EV_MTU, mtu); }
+
+static void takeEvents() {
+  VtpEvent e;
+  while (s_events && xQueueReceive(s_events, &e, 0) == pdTRUE) {
+    switch (e.kind) {
+      case EV_CONNECT:    linkUp();   break;
+      case EV_DISCONNECT: linkDown(); break;
+
+      case EV_MTU:
+        s_mtu = e.value;
+        s_mtuWarned = false;
+        break;
+
+      case EV_CAN_CCCD: {
+        bool on = (e.value & 0x0001) != 0;
+        if (on && !s_canSubscribed) canVtpReset();   // no backlog from before the client asked
+        s_canSubscribed = on;
+        break;
+      }
+
+      case EV_CONTROL_CCCD:
+        s_ctlIndications = (e.value & 0x0002) != 0;
+        break;
+
+      case EV_CONTROL_WRITE:
+        ctlReceive(e);
+        break;
+    }
+  }
 }
 
 void vtpPoll() {
+  // Before any response goes out, so a request that arrived while one was
+  // still owed is refused as busy rather than let through by this pass's send.
+  takeEvents();
+
   if (!s_connected) return;
 
   // One response out per pass, and only when the link is not already carrying
@@ -548,14 +638,16 @@ void vtpPoll() {
   // confirmation rather than being refused.
   if (s_respCount && !s_indicateOutstanding && s_control) {
     const CtlResp& front = s_resp[s_respHead];
+    // Set before the call: the confirmation can come back on the host task
+    // before indicate() returns, and setting it afterwards would leave it stuck.
+    s_indicateOutstanding = true;
     if (s_control->indicate(front.buf, front.len)) {
-      s_indicateOutstanding = true;
       s_respHead = (s_respHead + 1) % CTL_RESP_SLOTS;
       s_respCount--;
+    } else {
+      s_indicateOutstanding = false;
     }
   }
-
-  if (s_req.used && respRoom()) ctlApply();
 
   canFlush();
 }
@@ -563,6 +655,8 @@ void vtpPoll() {
 // --- Bring-up ---------------------------------------------------------------
 
 void vtpBegin(NimBLEServer* server) {
+  s_events = xQueueCreate(VTP_EVENT_SLOTS, sizeof(VtpEvent));
+
   NimBLEService* svc = server->createService(VTP_SERVICE_UUID);
 
   s_info = svc->createCharacteristic(VTP_CHAR_INFO_UUID, NIMBLE_PROPERTY::READ);

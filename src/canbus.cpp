@@ -5,19 +5,30 @@
 #include <driver/twai.h>
 #include <driver/gpio.h>
 #include <esp_timer.h>
+#include <sdkconfig.h>
 #include <string.h>
 
-// Overridable from platformio.ini so a rewire is a build flag, not a patch.
+// Listen-only alone is not silent on the ESP32, S2, S3 or C3: the controller
+// still sends dominant error frames unless the IDF was built with this errata
+// workaround, which holds it error-passive. platformio.ini pins a platform
+// that has it on.
+#if !CONFIG_TWAI_ERRATA_FIX_LISTEN_ONLY_DOM
+#error "CONFIG_TWAI_ERRATA_FIX_LISTEN_ONLY_DOM is off: this build would drive the car's CAN bus. Use the platform pinned in platformio.ini."
+#endif
+
+// Pins come from platformio.ini only. No fallback: on the carrier GPIO5 is the
+// transceiver's TXD, and a guessed pin map could put LED data on the car's bus.
 #ifndef CAN_TX_GPIO
-#define CAN_TX_GPIO 6
+#error "CAN_TX_GPIO is not defined; set it in platformio.ini"
 #endif
 #ifndef CAN_RX_GPIO
-#define CAN_RX_GPIO 7
+#error "CAN_RX_GPIO is not defined; set it in platformio.ini"
 #endif
 #define TWAI_TX_PIN ((gpio_num_t)CAN_TX_GPIO)
 #define TWAI_RX_PIN ((gpio_num_t)CAN_RX_GPIO)
 
-static bool     s_up            = false;
+static bool     s_driverRunning = false;
+static uint32_t s_lastFrameMs   = 0;   // last real frame off the bus, for canUp()
 static uint16_t s_rpm           = 0;
 static uint32_t s_lastRpmMs     = 0;
 static uint32_t s_frameCount    = 0;
@@ -41,9 +52,10 @@ static size_t   s_filterCount   = 0;
 // That is what makes two independent readers cheap: the writer does not touch
 // either cursor.
 //
-// Everything here runs on the main loop task — canPoll() writes, the two BLE
-// services read, all from loop() — so none of it is synchronised and none of it
-// needs to be. Moving any of it to a task of its own is not a small change.
+// Everything here runs on the main loop task, so none of it is synchronised.
+// canPoll() writes and the two BLE services read from loop(); their callbacks
+// run on NimBLE's host task and only queue work for loop() to do. Calling any
+// function in this file from a callback is a race.
 #define RING_SIZE 128
 static CapFrame s_ring[RING_SIZE];
 static uint64_t s_head = 0, s_tailLegacy = 0, s_tailVtp = 0;
@@ -109,16 +121,16 @@ void canBegin() {
 
   if (twai_driver_install(&g, &t, &f) != ESP_OK) {
     Serial.println("CAN: driver install failed");
-    s_up = false;
+    s_driverRunning = false;
     return;
   }
   if (twai_start() != ESP_OK) {
     Serial.println("CAN: start failed");
-    s_up = false;
+    s_driverRunning = false;
     return;
   }
   Serial.printf("CAN: listen-only, 500 kbit, TX=GPIO%d RX=GPIO%d\n", CAN_TX_GPIO, CAN_RX_GPIO);
-  s_up = true;
+  s_driverRunning = true;
   s_rateWindowMs = millis();
 }
 
@@ -127,18 +139,22 @@ void canPoll() {
 
   twai_status_info_t st;
   if (twai_get_status_info(&st) == ESP_OK) {
-    // Listen-only cannot reach bus-off — it never transmits an error frame — so
-    // the only recovery that matters here is a driver that stopped.
+    // With the errata fix the controller sits error-passive and never
+    // transmits, so it cannot go bus-off; the only recovery that matters here
+    // is a driver that stopped. It also means RUNNING says nothing about
+    // whether the bus is alive, which is why canUp() goes by frames heard.
     if (st.state == TWAI_STATE_STOPPED) {
-      s_up = false;
+      s_driverRunning = false;
       twai_start();
     } else if (st.state == TWAI_STATE_RUNNING) {
-      s_up = true;
+      s_driverRunning = true;
     }
     if (st.rx_missed_count > s_rxMissed) {
       s_rxMissed = st.rx_missed_count > 0xFFFF ? 0xFFFF : (uint16_t)st.rx_missed_count;
     }
   }
+
+  bool simulating = cfg.flags & SL_FLAG_SIMULATE;
 
   // Bounded per call. Draining without a cap lets a busy bus starve the LED
   // update and the BLE stack, which is the one failure that is visible from the
@@ -147,25 +163,25 @@ void canPoll() {
     twai_message_t m;
     if (twai_receive(&m, 0) != ESP_OK) break;
     s_frameCount++;
+    s_lastFrameMs = now;
 
-    // Read the clock per frame, not per call: at 24 frames an iteration a
-    // shared stamp would file a whole batch under one instant and flatten the
-    // spacing VTP exists to carry.
-    //
-    // This is when the driver handed the frame over, which is later than the
-    // end-of-frame VTP §6.7 asks for by however long it sat in the rx queue.
-    // The gap is small and it is not zero; it is stated here rather than
-    // claimed away, because a client aligning below a millisecond is entitled
-    // to know that this device measures arrival at the software boundary.
+    // Per frame, not per call, or a batch of 24 shares one stamp and VTP loses
+    // the spacing it exists to carry. This is when the driver handed the frame
+    // over: later than the end-of-frame VTP §6.7 asks for by however long it
+    // sat in the rx queue.
     uint64_t tsUs = (uint64_t)esp_timer_get_time();
 
-    if (m.identifier == cfg.canRpmId && m.data_length_code >= 4) {
+    bool isRpmFrame = m.identifier == cfg.canRpmId;
+    if (isRpmFrame && m.data_length_code >= 4 && cfg.rpmScaleX10 != 0) {
       uint16_t raw = (uint16_t)((m.data[3] << 8) | m.data[2]);
       s_rpm = (uint16_t)((raw * 10UL) / cfg.rpmScaleX10);
       s_lastRpmMs = now;
     }
 
     uint8_t want = consumers(m, tsUs);
+    // While simulating, the app's frame stream shows the synthetic RPM frame in
+    // place of the car's so the two RPMs never interleave. VTP keeps the real one.
+    if (simulating && isRpmFrame) want &= ~CAN_WANT_LEGACY;
     if (want) ringPush(m, tsUs, want);
   }
 
@@ -183,7 +199,11 @@ uint16_t canRpm() {
   return canRpmFresh() ? s_rpm : 0;
 }
 bool canRpmFresh()        { return s_lastRpmMs != 0 && (millis() - s_lastRpmMs) < RPM_STALE_MS; }
-bool canUp()              { return s_up; }
+// Up means frames are arriving, not that the driver is running: a listen-only
+// controller reports RUNNING on a dead or unplugged bus.
+bool canUp() {
+  return s_driverRunning && s_lastFrameMs != 0 && (millis() - s_lastFrameMs) < CAN_SILENT_MS;
+}
 uint16_t canFramesPerSec(){ return s_framesPerSec; }
 uint16_t canRxMissed()    { return s_rxMissed; }
 
@@ -262,8 +282,9 @@ void canInjectSimulated(uint16_t rpm) {
 
   s_frameCount++;
   uint64_t tsUs = (uint64_t)esp_timer_get_time();
-  uint8_t want = consumers(m, tsUs);
-  if (want) ringPush(m, tsUs, want);
+  // The app's stream only. VTP carries the bus and nothing else, and has no
+  // flag to mark a frame as synthetic, so vtpAdmit() never sees this one.
+  if (wanted(m.identifier)) ringPush(m, tsUs, CAN_WANT_LEGACY);
 }
 
 void canSetStream(uint8_t mode) {

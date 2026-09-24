@@ -17,12 +17,13 @@ class NimBLEServer;
 // bleBegin(), before advertising starts.
 void vtpBegin(NimBLEServer* server);
 
-// Sends whatever the CAN batcher has, and works the control queue. Called every
-// loop, from blePoll().
+// Applies queued BLE events, sends whatever the CAN batcher has, and works the
+// control queue. Called every loop, from blePoll().
 void vtpPoll();
 
 // Link events, forwarded by blesvc.cpp because that is where the server
-// callbacks live. A VTP subscription table lives and dies with one connection
+// callbacks live. They run on NimBLE's host task, so each only queues the event
+// for vtpPoll(). A VTP subscription table lives and dies with one connection
 // (§9.1) and so does the notification sequence (§8.2).
 void vtpOnConnect();
 void vtpOnDisconnect();
