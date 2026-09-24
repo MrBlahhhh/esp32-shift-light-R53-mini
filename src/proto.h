@@ -15,22 +15,13 @@
 #define PROTO_VERSION 1
 
 #define SL_SERVICE_UUID   "6d5f0001-9c2b-4a7e-b8d3-5a1f2c4e8b70"
-#define SL_CONFIG_UUID    "6d5f0002-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // read, write needs pairing
+#define SL_CONFIG_UUID    "6d5f0002-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // read; write needs a verified app
 #define SL_TELEMETRY_UUID "6d5f0003-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // notify
 #define SL_CANFRAME_UUID  "6d5f0004-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // notify
-#define SL_COMMAND_UUID   "6d5f0005-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // write, needs pairing
+#define SL_COMMAND_UUID   "6d5f0005-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // write, needs a verified app
+#define SL_AUTH_UUID      "6d5f0006-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // read challenge, write response
 
 #define SL_DEVICE_NAME    "R53-ShiftLight"
-
-// The pairing PIN, the same on every board. Config and command writes need a
-// link paired with it; reads, notifications and VTP stay open. The Android app
-// (Proto.PAIRING_PIN) and the web app (proto.ts PAIRING_PIN) carry the same
-// number, so a build with a different one needs both apps changed to match.
-// Six digits: Android turns the PIN it types into an LE passkey digit by digit.
-#ifndef SHIFTLIGHT_PAIRING_PIN
-#define SHIFTLIGHT_PAIRING_PIN 530053
-#endif
-static_assert(SHIFTLIGHT_PAIRING_PIN <= 999999, "An LE passkey is at most six digits");
 
 // What goes on air, as a SHORTENED local name (AD type 0x08). SL_DEVICE_NAME is
 // still the GAP name a client reads once connected; this is the one that has to
@@ -132,3 +123,24 @@ static_assert(sizeof(CanFrameRec) == 17, "CanFrameRec must stay 17 bytes");
 
 #define SL_MAX_LEDS   32
 #define SL_MAX_FILTER 16
+
+// --- App verification ---------------------------------------------------------
+// Config and command writes count only from a connection that has answered this
+// board's challenge; from any other they are ignored. Per connection:
+//   1. Read SL_AUTH_UUID: 16 random bytes, fresh for every connection.
+//   2. Write back the first 16 bytes of HMAC-SHA256(key = SHIFTLIGHT_APP_KEY
+//      in appkey.h, message = "SLv1" || challenge).
+//   3. Read SL_AUTH_UUID again: one byte, SL_AUTH_VERIFIED, once the answer was
+//      right; the challenge again if it was not.
+// A 16-byte write succeeds at the ATT level, right or wrong: NimBLE-Arduino
+// gives a write callback no way to return an error, so step 3 is how an app
+// learns the outcome. Nothing is stored; it all ends with the connection.
+
+#define SL_AUTH_PREFIX        "SLv1"
+#define SL_AUTH_PREFIX_LEN    4
+#define SL_AUTH_CHALLENGE_LEN 16
+#define SL_AUTH_RESPONSE_LEN  16
+#define SL_AUTH_VERIFIED      0x01
+// Wrong answers a connection gets before the board stops checking them. A
+// guess is a 1 in 2^128 shot, so this only keeps a script from filling the log.
+#define SL_AUTH_MAX_ATTEMPTS  5

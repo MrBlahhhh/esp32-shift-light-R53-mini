@@ -181,61 +181,63 @@ never makes the config count as unsaved, so a board can't end up booting into
 the sweep because someone saved while testing. While simulating, the frame
 stream carries the synthetic `0x316` in place of the car's.
 
-## Pairing
+## App verification
 
-Changing anything on the board needs a phone paired with its PIN, **530053**.
-Every board has the same one. It keeps random phones in a car park from moving
-your redline or rebooting the board. It doesn't keep out anyone who has the app
-or knows the PIN, and isn't meant to.
+Only the apps can change anything on the board. A phone running the Android app
+or the web app (Chrome, or Bluefy on iPhone) proves it's one of them when it
+connects, and nothing asks the driver for anything: no pairing dialog, no PIN.
+A random phone in a car park, or nRF Connect, can connect and look, but its
+writes are ignored.
 
-What needs the PIN is every write on the shift light service: the config, and
-every command (save, defaults, reboot, identify, and the frame stream on/off
-and filter). What stays open:
+What needs a verified app is every write on the shift light service: the config
+(which includes Simulate), and every command (save, defaults, reboot, identify,
+the frame stream on/off and its filter). What stays open:
 
-- Reading the config and telemetry, and the telemetry notifications. A phone
-  that hasn't paired can connect and watch the RPM, but can't change anything.
-- The whole [VTP/1](#vtp1) service. A logger that only speaks VTP is never
-  asked to pair, and still gets the bus.
+- Reading the config and telemetry, and the telemetry notifications. Anything
+  can connect and watch the RPM.
+- The whole [VTP/1](#vtp1) service. A logger that only speaks VTP never
+  verifies and still gets the bus.
 
-It's LE Secure Connections with a fixed passkey. `bleBegin()` turns on bonding,
-MITM protection and SC, declares the board DisplayOnly so the phone asks for a
-passkey, and answers every passkey request with the PIN
-(`setSecurityAuth(true, true, true)`, `setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY)`,
-`setSecurityPasskey(SHIFTLIGHT_PAIRING_PIN)`). The config and command
-characteristics are `WRITE_ENC | WRITE_AUTHEN`: the link has to be encrypted
-with a key that came from the PIN, so Just Works from a central with no keyboard
-is refused as well. The board never starts pairing itself.
+How it works, per connection:
 
-- **Android app:** pairs as soon as it connects and types the PIN in for you.
-  Some phones flash the system PIN box for a moment anyway.
-- **Web app (Chrome, Bluefy on iPhone):** the first Apply, Save or command
-  makes the phone ask for a PIN. Type 530053. The app shows it on the Shift
-  light tab, and again if pairing fails.
-- **nRF Connect or a script:** bond, and enter 530053 when asked.
+1. On connect the board makes a fresh 16-byte random challenge
+   (`esp_fill_random`) for that connection.
+2. The app reads the auth characteristic (`…0006`) and gets the challenge.
+3. The app writes back the first 16 bytes of
+   HMAC-SHA256(key, `"SLv1"` + challenge).
+4. The board checks it with mbedtls, in constant time. If it's right, that
+   connection may change settings until it disconnects. The app reads `…0006`
+   again to find out: one byte, `01`, means verified; the challenge again means
+   the board said no.
 
-Up to eight phones are remembered, in NVS, across power cycles. A ninth pushes
-out the one paired longest ago. The boot log says how many are stored:
+A wrong response is logged and changes nothing. After five on one connection the
+board stops checking that connection's responses until it reconnects. A config
+write from an unverified connection is dropped and the board puts the running
+config back in the characteristic, so a read shows nothing changed. The serial
+log says so:
 
 ```
-BLE: settings need pairing, PIN 530053; 2 of 8 phones paired (type 'forget' to clear them)
+BLE: config write refused: app not verified
 ```
 
-**Changing the PIN.** Uncomment `-DSHIFTLIGHT_PAIRING_PIN=` in
-[`platformio.ini`](platformio.ini) and give it six digits. The apps carry the
-same number, `Proto.PAIRING_PIN` in the Android app and `PAIRING_PIN` in the web
-app's `src/lib/proto.ts`, so change both with it. Android can't type a PIN it
-doesn't know, and the web app would show the wrong one.
+**Nothing is stored on the board.** No bonds, no list of phones, nothing to
+forget. Verification lives in RAM against the connection handle and is gone on
+disconnect. Every connection proves itself again, which takes three GATT
+operations and happens before the app's first config read.
 
-**Forgetting phones.** Open a serial monitor at 115200 (`pio device monitor`),
-type `forget` and press Enter. Every stored pairing goes, and a paired phone
-that's connected is dropped. Erasing the flash (`pio run -e esp32-c3 -t erase`)
-does the same and also wipes the saved settings. Either way the phone still
-holds its half of the old pairing, so remove the board from the phone's
-Bluetooth settings before connecting again, or the reconnect fails.
+**The key is shared.** It's `SHIFTLIGHT_APP_KEY` in
+[`src/appkey.h`](src/appkey.h): 32 bytes, the same in this firmware, the twins
+board's firmware, the Android app (`Proto.APP_KEY_HEX`) and the web app
+(`APP_KEY_HEX` in `src/lib/proto.ts`). They have to match. A board and an app
+with different keys connect fine and show live data, and the app then says
+"This board did not accept the app. Update the app and the board firmware." and
+keeps its settings controls off. `appkey.h` carries a check value, and both
+apps' unit tests assert the same one, so a key changed in one place and not the
+others fails a test.
 
-**Flashing this over older firmware.** Older builds never paired, so there is
-nothing to clear. Each phone pairs once, the first time the Android app connects
-or the first time the web app changes something.
+The key ships in every copy of both apps, so anyone who digs it out can write
+settings. This keeps out random phones and generic BLE apps, which is all it's
+for.
 
 ## The wire format
 
@@ -253,14 +255,15 @@ how a bad threshold reaches the LEDs.
 
 | Characteristic | Dir | Payload |
 |---|---|---|
-| `…0002` | read, write (PIN) | `ConfigBlob`, 32 bytes |
+| `…0002` | read, write (verified) | `ConfigBlob`, 32 bytes |
 | `…0003` | notify | `TelemetryBlob`, 12 bytes, 10 Hz |
 | `…0004` | notify | count byte + up to 13 × `CanFrameRec` |
-| `…0005` | write (PIN) | one opcode byte, plus arguments |
+| `…0005` | write (verified) | one opcode byte, plus arguments |
+| `…0006` | read, write | auth: 16-byte challenge, or `01` once verified; write the 16-byte response |
 
-"(PIN)" means the write needs a link paired with the PIN; see
-[Pairing](#pairing). Without one the board answers Insufficient Authentication
-(Insufficient Encryption from a phone it has a key for that hasn't encrypted yet).
+"(verified)" means the write only counts from a connection that has passed
+[App verification](#app-verification). From any other the write still succeeds
+at the ATT level and is ignored.
 
 Both ends pin these byte offsets in tests. They are the only thing standing
 between a one-byte layout drift and a shift light that looks fine and is wrong.
@@ -339,8 +342,8 @@ advertised name for an exact string is not.
 Boards flashed before VTP was added are in cars and in customers' hands. They
 serve the one service, advertise the complete name, and have no VTP
 characteristics at all. One app talks to both generations, because nothing in
-the old protocol moved: same service UUID, same four characteristics, the config
-blob still 32 bytes and telemetry still 12, same opcodes.
+the old protocol moved: same service UUID, same four original characteristics,
+the config blob still 32 bytes and telemetry still 12, same opcodes.
 
 **`PROTO_VERSION` stays 1.** `settingsApply()` rejects a config blob whose
 version byte does not match, so bumping it makes every board already out there
@@ -356,14 +359,13 @@ Three consequences worth having written down:
   `pio run -e esp32-c3 -t upload`, or not at all.
 - **A board cannot say what firmware it runs.** There is no build number in the
   old protocol and no room to add one without changing a blob the app pins byte
-  offsets against. Whether the VTP service is present in the GATT table is the
-  only thing that distinguishes the two.
+  offsets against. Whether the VTP service (and now the auth characteristic)
+  is present in the GATT table is the only thing that distinguishes them.
 
-Pairing didn't move anything either. The PIN lives in the security flags on two
-characteristics, which a client never sees in the GATT table, so boards from
-before it look the same and take writes from anyone. Both apps cope: the web
-app's writes just succeed, and the Android app's bond request at connect goes
-nowhere on an old board (it never bonds) without the app calling that a failure.
+App verification added one characteristic, `…0006`, and moved nothing else.
+Boards from before it don't have that characteristic and take writes from
+anyone. Both apps look for it after service discovery and, when it's missing,
+skip the handshake and work as they always did.
 
 ## Related
 

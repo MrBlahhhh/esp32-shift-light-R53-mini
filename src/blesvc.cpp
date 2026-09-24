@@ -4,6 +4,7 @@
 #include "canbus.h"
 #include "shiftlight.h"
 #include "vtpsvc.h"
+#include "appverify.h"
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <freertos/queue.h>
@@ -35,6 +36,10 @@ struct PhoneWrite {
   uint8_t bytes[1 + SL_MAX_FILTER * 4];  // the longest write either accepts
 };
 static QueueHandle_t s_phoneWrites = nullptr;
+
+// Set on the host task when a config write from an unverified app is refused,
+// cleared by blePoll() once it has put the running config back.
+static volatile bool s_republishConfig = false;
 
 static void queueWrite(uint8_t target, const uint8_t* bytes, size_t len) {
   if (!s_phoneWrites) return;
@@ -74,28 +79,17 @@ class ServerCallbacks : public NimBLEServerCallbacks {
     // subscriptions, sequence numbers, a clock reading. Both are told about the
     // same link from here rather than each registering its own callbacks.
     vtpOnConnect();
+    appVerifyOnConnect(h);
     Serial.println("BLE: connected");
-  }
-  // Fires after pairing and after a paired phone re-encrypts on reconnect.
-  void onAuthenticationComplete(NimBLEConnInfo& info) override {
-    if (info.isEncrypted() && info.isAuthenticated()) {
-      Serial.printf("BLE: link secured with the PIN (%s)\n",
-                    info.isBonded() ? "phone paired" : "phone not stored");
-    } else if (info.isEncrypted()) {
-      // Just Works, from a central with no keyboard: encrypted, but no PIN
-      // was typed, so WRITE_AUTHEN still refuses its writes.
-      Serial.println("BLE: encrypted without the PIN, settings stay locked");
-    } else {
-      Serial.println("BLE: pairing failed (wrong PIN?), settings stay locked");
-    }
   }
   void onMTUChange(uint16_t mtu, NimBLEConnInfo& /*info*/) override {
     s_mtu = mtu;
     vtpSetMtu(mtu);
     Serial.printf("BLE: MTU %u\n", (unsigned)mtu);
   }
-  void onDisconnect(NimBLEServer* /*s*/, NimBLEConnInfo& /*info*/, int /*reason*/) override {
+  void onDisconnect(NimBLEServer* /*s*/, NimBLEConnInfo& info, int /*reason*/) override {
     s_connected = false;
+    appVerifyOnDisconnect(info.getConnHandle());
     // Streaming is per-connection state; left on, the next client inherits a
     // backlog from someone else's session. Queued like the phone's own
     // stream-off so it lands after anything that phone wrote before it left.
@@ -107,16 +101,48 @@ class ServerCallbacks : public NimBLEServerCallbacks {
   }
 };
 
+// The challenge and the verified byte differ per connection and the attribute
+// holds one value, so it is set for each reader. NimBLE calls onRead on the host
+// task just before copying the value into the response (NimBLEServer.cpp,
+// handleGattEvent), and every read is served from that one task, so two readers
+// can't swap values in between.
+class AuthCallbacks : public NimBLECharacteristicCallbacks {
+  void onRead(NimBLECharacteristic* c, NimBLEConnInfo& info) override {
+    uint8_t value[SL_AUTH_CHALLENGE_LEN];
+    size_t len = appVerifyReadValue(info.getConnHandle(), value);
+    c->setValue(value, len);
+  }
+  void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& info) override {
+    NimBLEAttValue v = c->getValue();
+    appVerifyOnResponse(info.getConnHandle(), v.data(), v.size());
+  }
+};
+
+// Settings writes from an app that has not verified on this connection are
+// dropped here, before the queue. The write still succeeds at the ATT level:
+// NimBLE-Arduino has no way for onWrite to return an error.
 class ConfigCallbacks : public NimBLECharacteristicCallbacks {
-  void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& /*info*/) override {
+  void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& info) override {
+    if (!appVerified(info.getConnHandle())) {
+      Serial.println("BLE: config write refused: app not verified");
+      // NimBLE stored the refused bytes as the attribute value before calling
+      // this. Put back what is running, so a read shows nothing changed.
+      s_republishConfig = true;
+      return;
+    }
     NimBLEAttValue v = c->getValue();
     queueWrite(WRITE_CONFIG, v.data(), v.size());
   }
 };
 
 class CommandCallbacks : public NimBLECharacteristicCallbacks {
-  void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& /*info*/) override {
+  void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& info) override {
     NimBLEAttValue v = c->getValue();
+    if (!appVerified(info.getConnHandle())) {
+      Serial.printf("BLE: command %d write refused: app not verified\n",
+                    v.size() > 0 ? (int)v.data()[0] : -1);
+      return;
+    }
     queueWrite(WRITE_COMMAND, v.data(), v.size());
   }
 };
@@ -197,29 +223,15 @@ void bleBegin() {
   // than the bus produces it.
   NimBLEDevice::setMTU(247);
 
-  // Pairing with the shared PIN: bonding, MITM protection, LE Secure
-  // Connections. After init(), which resets all three to off. The board has no
-  // screen, but DisplayOnly is the IO capability that makes the phone ask for a
-  // passkey, and NimBLE answers with this fixed one instead of a random one.
-  // Nothing here starts security itself: a phone pairs when it first writes a
-  // characteristic below, or when the app asks it to, and a VTP client that
-  // never writes those is never asked.
-  NimBLEDevice::setSecurityAuth(true, true, true);
-  NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY);
-  NimBLEDevice::setSecurityPasskey(SHIFTLIGHT_PAIRING_PIN);
-
   NimBLEServer* server = NimBLEDevice::createServer();
   server->setCallbacks(new ServerCallbacks());
 
   NimBLEService* service = server->createService(SL_SERVICE_UUID);
 
-  // Writes need a link paired with the PIN: WRITE_ENC wants it encrypted,
-  // WRITE_AUTHEN wants the key to have come from a PIN rather than Just Works.
-  // Reads stay open. The blob is thresholds and colours, nothing secret, and a
-  // phone that has not paired can still show what the board is running.
+  // Reads stay open: the blob is thresholds and colours, nothing secret, and an
+  // app that has not verified can still show what the board is running.
   s_config = service->createCharacteristic(
-      SL_CONFIG_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE |
-                      NIMBLE_PROPERTY::WRITE_ENC | NIMBLE_PROPERTY::WRITE_AUTHEN);
+      SL_CONFIG_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
   s_config->setCallbacks(new ConfigCallbacks());
   blePublishConfig();
 
@@ -230,11 +242,16 @@ void bleBegin() {
       SL_CANFRAME_UUID, NIMBLE_PROPERTY::NOTIFY);
 
   // Every command changes the board (save, defaults, reboot, identify, the frame
-  // stream), so all of them need the PIN, the same as a config write.
+  // stream), so all of them need a verified app, the same as a config write.
   NimBLECharacteristic* cmd = service->createCharacteristic(
-      SL_COMMAND_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_ENC |
-                       NIMBLE_PROPERTY::WRITE_AUTHEN);
+      SL_COMMAND_UUID, NIMBLE_PROPERTY::WRITE);
   cmd->setCallbacks(new CommandCallbacks());
+
+  // Max length 16, so NimBLE refuses a longer write itself (Invalid Attribute
+  // Value Length) rather than storing it.
+  NimBLECharacteristic* auth = service->createCharacteristic(
+      SL_AUTH_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE, SL_AUTH_CHALLENGE_LEN);
+  auth->setCallbacks(new AuthCallbacks());
 
   // The second protocol, on the same server and the same connection. It carries
   // the CAN bus and nothing else; every byte that makes this a shift light is
@@ -272,20 +289,6 @@ void bleBegin() {
 
   Serial.printf("BLE: advertising as %s (%s on air), shift light + VTP/1\n",
                 SL_DEVICE_NAME, SL_ADV_SHORT_NAME);
-  Serial.printf("BLE: settings need pairing, PIN %06u; %d of %d phones paired "
-                "(type 'forget' to clear them)\n",
-                (unsigned)SHIFTLIGHT_PAIRING_PIN, NimBLEDevice::getNumBonds(),
-                (int)MYNEWT_VAL(BLE_STORE_MAX_BONDS));
-}
-
-void bleForgetPhones() {
-  int paired = NimBLEDevice::getNumBonds();
-  // Also drops the link to a paired phone that is connected right now.
-  if (NimBLEDevice::deleteAllBonds()) {
-    Serial.printf("BLE: forgot %d paired phone(s); each pairs again with the PIN\n", paired);
-  } else {
-    Serial.println("BLE: FORGET FAILED, some pairings may remain; erase the flash to be sure");
-  }
 }
 
 bool bleConnected() { return s_connected; }
@@ -295,6 +298,10 @@ void blePoll(uint16_t rpm) {
   while (s_phoneWrites && xQueueReceive(s_phoneWrites, &w, 0) == pdTRUE) {
     if (w.target == WRITE_CONFIG) applyConfig(w);
     else                          applyCommand(w);
+  }
+  if (s_republishConfig) {
+    s_republishConfig = false;
+    blePublishConfig();
   }
 
   // Before the return below, and gated on its own state: VTP's control plane
