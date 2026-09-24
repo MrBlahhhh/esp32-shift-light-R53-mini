@@ -3,7 +3,11 @@
 #include "proto.h"
 #include <Arduino.h>
 #include <esp_random.h>
+// This header has no extern "C" guard of its own, unlike md.h. Without the
+// wrapper the call links against a C++-mangled name the C library never exports.
+extern "C" {
 #include <mbedtls/constant_time.h>
+}
 #include <mbedtls/md.h>
 #include <string.h>
 
