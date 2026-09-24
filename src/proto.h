@@ -15,12 +15,22 @@
 #define PROTO_VERSION 1
 
 #define SL_SERVICE_UUID   "6d5f0001-9c2b-4a7e-b8d3-5a1f2c4e8b70"
-#define SL_CONFIG_UUID    "6d5f0002-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // read/write
+#define SL_CONFIG_UUID    "6d5f0002-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // read, write needs pairing
 #define SL_TELEMETRY_UUID "6d5f0003-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // notify
 #define SL_CANFRAME_UUID  "6d5f0004-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // notify
-#define SL_COMMAND_UUID   "6d5f0005-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // write
+#define SL_COMMAND_UUID   "6d5f0005-9c2b-4a7e-b8d3-5a1f2c4e8b70"  // write, needs pairing
 
 #define SL_DEVICE_NAME    "R53-ShiftLight"
+
+// The pairing PIN, the same on every board. Config and command writes need a
+// link paired with it; reads, notifications and VTP stay open. The Android app
+// (Proto.PAIRING_PIN) and the web app (proto.ts PAIRING_PIN) carry the same
+// number, so a build with a different one needs both apps changed to match.
+// Six digits: Android turns the PIN it types into an LE passkey digit by digit.
+#ifndef SHIFTLIGHT_PAIRING_PIN
+#define SHIFTLIGHT_PAIRING_PIN 530053
+#endif
+static_assert(SHIFTLIGHT_PAIRING_PIN <= 999999, "An LE passkey is at most six digits");
 
 // What goes on air, as a SHORTENED local name (AD type 0x08). SL_DEVICE_NAME is
 // still the GAP name a client reads once connected; this is the one that has to

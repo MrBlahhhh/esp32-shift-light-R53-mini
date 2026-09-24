@@ -17,9 +17,31 @@
 #include "canbus.h"
 #include "shiftlight.h"
 #include "blesvc.h"
+#include <string.h>
 
 static uint32_t s_lastRender = 0;
 static uint32_t s_lastPrint  = 0;
+
+// Serial console, one command per line. "forget" clears every paired phone,
+// for a lost phone or a board changing hands.
+static void serialPoll() {
+  static char line[16];
+  static size_t len = 0;
+  while (Serial.available() > 0) {
+    char c = (char)Serial.read();
+    if (c != '\r' && c != '\n') {
+      if (len < sizeof(line) - 1) line[len++] = c;
+      continue;
+    }
+    line[len] = '\0';
+    if (strcmp(line, "forget") == 0) {
+      bleForgetPhones();
+    } else if (len > 0) {
+      Serial.printf("unknown command '%s'; the only one is 'forget'\n", line);
+    }
+    len = 0;
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -73,6 +95,7 @@ void loop() {
   }
 
   blePoll(rpm);
+  serialPoll();
 
   if (now - s_lastPrint >= 1000) {
     s_lastPrint = now;

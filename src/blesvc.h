@@ -10,5 +10,7 @@ void bleBegin();
 void blePoll(uint16_t rpm);
 bool bleConnected();
 void blePublishConfig(); // refresh the config characteristic after a local change
+// Deletes every stored phone pairing. Each phone pairs again with the PIN.
+void bleForgetPhones();
 
 #define TELEMETRY_HZ 10

@@ -181,6 +181,62 @@ never makes the config count as unsaved, so a board can't end up booting into
 the sweep because someone saved while testing. While simulating, the frame
 stream carries the synthetic `0x316` in place of the car's.
 
+## Pairing
+
+Changing anything on the board needs a phone paired with its PIN, **530053**.
+Every board has the same one. It keeps random phones in a car park from moving
+your redline or rebooting the board. It doesn't keep out anyone who has the app
+or knows the PIN, and isn't meant to.
+
+What needs the PIN is every write on the shift light service: the config, and
+every command (save, defaults, reboot, identify, and the frame stream on/off
+and filter). What stays open:
+
+- Reading the config and telemetry, and the telemetry notifications. A phone
+  that hasn't paired can connect and watch the RPM, but can't change anything.
+- The whole [VTP/1](#vtp1) service. A logger that only speaks VTP is never
+  asked to pair, and still gets the bus.
+
+It's LE Secure Connections with a fixed passkey. `bleBegin()` turns on bonding,
+MITM protection and SC, declares the board DisplayOnly so the phone asks for a
+passkey, and answers every passkey request with the PIN
+(`setSecurityAuth(true, true, true)`, `setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY)`,
+`setSecurityPasskey(SHIFTLIGHT_PAIRING_PIN)`). The config and command
+characteristics are `WRITE_ENC | WRITE_AUTHEN`: the link has to be encrypted
+with a key that came from the PIN, so Just Works from a central with no keyboard
+is refused as well. The board never starts pairing itself.
+
+- **Android app:** pairs as soon as it connects and types the PIN in for you.
+  Some phones flash the system PIN box for a moment anyway.
+- **Web app (Chrome, Bluefy on iPhone):** the first Apply, Save or command
+  makes the phone ask for a PIN. Type 530053. The app shows it on the Shift
+  light tab, and again if pairing fails.
+- **nRF Connect or a script:** bond, and enter 530053 when asked.
+
+Up to eight phones are remembered, in NVS, across power cycles. A ninth pushes
+out the one paired longest ago. The boot log says how many are stored:
+
+```
+BLE: settings need pairing, PIN 530053; 2 of 8 phones paired (type 'forget' to clear them)
+```
+
+**Changing the PIN.** Uncomment `-DSHIFTLIGHT_PAIRING_PIN=` in
+[`platformio.ini`](platformio.ini) and give it six digits. The apps carry the
+same number, `Proto.PAIRING_PIN` in the Android app and `PAIRING_PIN` in the web
+app's `src/lib/proto.ts`, so change both with it. Android can't type a PIN it
+doesn't know, and the web app would show the wrong one.
+
+**Forgetting phones.** Open a serial monitor at 115200 (`pio device monitor`),
+type `forget` and press Enter. Every stored pairing goes, and a paired phone
+that's connected is dropped. Erasing the flash (`pio run -e esp32-c3 -t erase`)
+does the same and also wipes the saved settings. Either way the phone still
+holds its half of the old pairing, so remove the board from the phone's
+Bluetooth settings before connecting again, or the reconnect fails.
+
+**Flashing this over older firmware.** Older builds never paired, so there is
+nothing to clear. Each phone pairs once, the first time the Android app connects
+or the first time the web app changes something.
+
 ## The wire format
 
 [`src/proto.h`](src/proto.h) is the contract, and the app mirrors it field for
@@ -197,10 +253,14 @@ how a bad threshold reaches the LEDs.
 
 | Characteristic | Dir | Payload |
 |---|---|---|
-| `…0002` | read/write | `ConfigBlob`, 32 bytes |
+| `…0002` | read, write (PIN) | `ConfigBlob`, 32 bytes |
 | `…0003` | notify | `TelemetryBlob`, 12 bytes, 10 Hz |
 | `…0004` | notify | count byte + up to 13 × `CanFrameRec` |
-| `…0005` | write | one opcode byte, plus arguments |
+| `…0005` | write (PIN) | one opcode byte, plus arguments |
+
+"(PIN)" means the write needs a link paired with the PIN; see
+[Pairing](#pairing). Without one the board answers Insufficient Authentication
+(Insufficient Encryption from a phone it has a key for that hasn't encrypted yet).
 
 Both ends pin these byte offsets in tests. They are the only thing standing
 between a one-byte layout drift and a shift light that looks fine and is wrong.
@@ -298,6 +358,12 @@ Three consequences worth having written down:
   old protocol and no room to add one without changing a blob the app pins byte
   offsets against. Whether the VTP service is present in the GATT table is the
   only thing that distinguishes the two.
+
+Pairing didn't move anything either. The PIN lives in the security flags on two
+characteristics, which a client never sees in the GATT table, so boards from
+before it look the same and take writes from anyone. Both apps cope: the web
+app's writes just succeed, and the Android app's bond request at connect goes
+nowhere on an old board (it never bonds) without the app calling that a failure.
 
 ## Related
 

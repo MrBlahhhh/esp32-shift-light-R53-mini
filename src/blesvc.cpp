@@ -76,6 +76,19 @@ class ServerCallbacks : public NimBLEServerCallbacks {
     vtpOnConnect();
     Serial.println("BLE: connected");
   }
+  // Fires after pairing and after a paired phone re-encrypts on reconnect.
+  void onAuthenticationComplete(NimBLEConnInfo& info) override {
+    if (info.isEncrypted() && info.isAuthenticated()) {
+      Serial.printf("BLE: link secured with the PIN (%s)\n",
+                    info.isBonded() ? "phone paired" : "phone not stored");
+    } else if (info.isEncrypted()) {
+      // Just Works, from a central with no keyboard: encrypted, but no PIN
+      // was typed, so WRITE_AUTHEN still refuses its writes.
+      Serial.println("BLE: encrypted without the PIN, settings stay locked");
+    } else {
+      Serial.println("BLE: pairing failed (wrong PIN?), settings stay locked");
+    }
+  }
   void onMTUChange(uint16_t mtu, NimBLEConnInfo& /*info*/) override {
     s_mtu = mtu;
     vtpSetMtu(mtu);
@@ -184,13 +197,29 @@ void bleBegin() {
   // than the bus produces it.
   NimBLEDevice::setMTU(247);
 
+  // Pairing with the shared PIN: bonding, MITM protection, LE Secure
+  // Connections. After init(), which resets all three to off. The board has no
+  // screen, but DisplayOnly is the IO capability that makes the phone ask for a
+  // passkey, and NimBLE answers with this fixed one instead of a random one.
+  // Nothing here starts security itself: a phone pairs when it first writes a
+  // characteristic below, or when the app asks it to, and a VTP client that
+  // never writes those is never asked.
+  NimBLEDevice::setSecurityAuth(true, true, true);
+  NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY);
+  NimBLEDevice::setSecurityPasskey(SHIFTLIGHT_PAIRING_PIN);
+
   NimBLEServer* server = NimBLEDevice::createServer();
   server->setCallbacks(new ServerCallbacks());
 
   NimBLEService* service = server->createService(SL_SERVICE_UUID);
 
+  // Writes need a link paired with the PIN: WRITE_ENC wants it encrypted,
+  // WRITE_AUTHEN wants the key to have come from a PIN rather than Just Works.
+  // Reads stay open. The blob is thresholds and colours, nothing secret, and a
+  // phone that has not paired can still show what the board is running.
   s_config = service->createCharacteristic(
-      SL_CONFIG_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+      SL_CONFIG_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE |
+                      NIMBLE_PROPERTY::WRITE_ENC | NIMBLE_PROPERTY::WRITE_AUTHEN);
   s_config->setCallbacks(new ConfigCallbacks());
   blePublishConfig();
 
@@ -200,8 +229,11 @@ void bleBegin() {
   s_canframe = service->createCharacteristic(
       SL_CANFRAME_UUID, NIMBLE_PROPERTY::NOTIFY);
 
+  // Every command changes the board (save, defaults, reboot, identify, the frame
+  // stream), so all of them need the PIN, the same as a config write.
   NimBLECharacteristic* cmd = service->createCharacteristic(
-      SL_COMMAND_UUID, NIMBLE_PROPERTY::WRITE);
+      SL_COMMAND_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_ENC |
+                       NIMBLE_PROPERTY::WRITE_AUTHEN);
   cmd->setCallbacks(new CommandCallbacks());
 
   // The second protocol, on the same server and the same connection. It carries
@@ -240,6 +272,20 @@ void bleBegin() {
 
   Serial.printf("BLE: advertising as %s (%s on air), shift light + VTP/1\n",
                 SL_DEVICE_NAME, SL_ADV_SHORT_NAME);
+  Serial.printf("BLE: settings need pairing, PIN %06u; %d of %d phones paired "
+                "(type 'forget' to clear them)\n",
+                (unsigned)SHIFTLIGHT_PAIRING_PIN, NimBLEDevice::getNumBonds(),
+                (int)MYNEWT_VAL(BLE_STORE_MAX_BONDS));
+}
+
+void bleForgetPhones() {
+  int paired = NimBLEDevice::getNumBonds();
+  // Also drops the link to a paired phone that is connected right now.
+  if (NimBLEDevice::deleteAllBonds()) {
+    Serial.printf("BLE: forgot %d paired phone(s); each pairs again with the PIN\n", paired);
+  } else {
+    Serial.println("BLE: FORGET FAILED, some pairings may remain; erase the flash to be sure");
+  }
 }
 
 bool bleConnected() { return s_connected; }
