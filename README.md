@@ -97,6 +97,10 @@ pio run -e esp32-s3-zero -t upload
 pio device monitor
 ```
 
+To flash without PlatformIO, from Chrome or Edge, there's a web flasher in
+[`web-flasher/`](web-flasher/README.md). It detects which board it's talking
+to and also handles a batch.
+
 There is no stock `esp32-s3-fh4r2` board in the platform — the older repos in
 this family pointed at a community board JSON. `esp32-s3-devkitc1-n4r2` is the
 stock definition for the same silicon (N4 = 4 MB flash, R2 = 2 MB quad PSRAM),
