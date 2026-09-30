@@ -1,4 +1,4 @@
-// R53 flasher, for the shift light's carrier board and the K-line + CAN bridge.
+// R53 flasher, for the R53 Shift Light's C3 board and its K-line + CAN board.
 // Talks to the board over Web Serial with esptool-js, works out which board it
 // is from the chip and which published build it is running from its flash, and
 // writes a build listed in releases.json (made by publish-release.ps1).
@@ -20,27 +20,27 @@ const RUN_FIRMWARE_RESET = "D0|R1|W200|R0|W200";
 // Keyed by PlatformIO env, which is also the folder name under firmware/<build>/.
 const BOARDS = {
   "esp32-c3": {
-    name: "Carrier board",
-    short: "carrier",
+    name: "R53 Shift Light C3 board",
+    short: "C3",
     module: "ESP32-C3 SuperMini",
     chip: "ESP32-C3",
     flashMB: 4,
     spec: "ESP32-C3 · 4 MB flash",
-    blurb: "The shift light board with the C3 SuperMini soldered on. A bare SuperMini takes the same build.",
+    blurb: "The 54 × 58 mm shift light board with the C3 SuperMini soldered on. A bare SuperMini takes the same build.",
     ledText: "the blue LED on the SuperMini blinks once a second",
     keepsText: "Thresholds, colours and brightness you saved stay as they are.",
     freshText: "It's restarting on the default settings. Set it up in the app and press Save.",
     art: moduleArt("C3", "#1b3a8a"),
   },
-  // The rev C K-line + CAN carrier. Firmware from R53_Mini_Kline_Canbus_Logger_Shiftlight.
+  // The rev C K-line + CAN board. Firmware from R53_Mini_Kline_Canbus_Logger_Shiftlight.
   "xiao_esp32s3": {
-    name: "K-line + CAN bridge",
-    short: "bridge",
+    name: "R53 Shift Light K-line + CAN board",
+    short: "K-line + CAN",
     module: "Seeed XIAO ESP32-S3",
     chip: "ESP32-S3",
     flashMB: 8,
     spec: "ESP32-S3 · 8 MB flash · 8 MB PSRAM",
-    blurb: "The rev C K-line + CAN carrier with the XIAO soldered flat: K-line, CAN, wideband and the shift light.",
+    blurb: "Rev C, with the XIAO soldered flat: K-line, CAN, wideband and the shift light on one board.",
     ledText: "the orange LED on the XIAO blinks once a second",
     keepsText: "The K-line polling set and the shift light settings you saved stay as they are.",
     freshText: "It's restarting on the defaults. Set up the shift light in the R53 Shift app and the K-line polling from R53 Logger.",
@@ -643,7 +643,7 @@ function render() {
     const commit = perBoard ? plan.sourceCommit : release.sourceCommit;
     const repo = perBoard ? plan.sourceRepo : state.manifest.sourceRepo;
     $("release-detail").textContent = (release.notes || "") +
-      (plan && plan.firmwareBuild ? ` Bridge firmware ${plan.firmwareBuild}.` : "");
+      (plan && plan.firmwareBuild ? ` K-line + CAN firmware ${plan.firmwareBuild}.` : "");
     const sourceHtml = !commit
       ? "Bench build, not from a published commit."
       : repo

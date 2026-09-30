@@ -145,7 +145,7 @@ if ($Build -le 0) {
     $Build = 1 + (@($others | ForEach-Object { [int]$_.build }) + 0 | Measure-Object -Maximum).Maximum
 }
 $others = @($others | Where-Object { [int]$_.build -ne $Build })
-Write-Host "Build $Build$(if ($sourceCommit) { " from $($sourceCommit.Substring(0, 7))" } else { ' (bench)' })"
+Write-Host "Build $Build$(if ($Bench) { ' (bench)' } else { " from $(($commits.Values | ForEach-Object { $_.Substring(0, 7) }) -join ', ')" })"
 
 # ---------------------------------------------------------------- stage each board
 
