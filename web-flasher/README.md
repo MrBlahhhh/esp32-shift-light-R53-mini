@@ -13,7 +13,6 @@ the product page's colours.
 | Chip | Flash | PSRAM | Env |
 |---|---|---|---|
 | ESP32-C3 | 4 MB | none | `esp32-c3` (carrier board, C3 SuperMini) |
-| ESP32-S3 | 4 MB | 2 MB | `esp32-s3-zero` (prototype, S3-Zero) |
 
 Anything else gets "not a shift light board, nothing flashed". "I know what
 this is" picks by hand; the chip family and flash size are still checked

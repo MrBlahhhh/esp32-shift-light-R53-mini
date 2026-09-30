@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>R53 shift light flasher</title>
-  <meta name="description" content="Put the R53 shift light firmware on the carrier board (ESP32-C3 SuperMini) or the S3-Zero prototype from the browser.">
+  <meta name="description" content="Put the R53 shift light firmware on the carrier board (ESP32-C3 SuperMini) from the browser.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800&family=Schibsted+Grotesk:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -33,7 +33,7 @@
       </svg>
       <div>
         <h1>R53 shift light flasher</h1>
-        <p class="subtitle">Firmware for the shift light's carrier board and the S3-Zero prototype, straight from the browser.</p>
+        <p class="subtitle">Firmware for the shift light's carrier board, straight from the browser.</p>
       </div>
     </header>
 
@@ -86,14 +86,13 @@
       <div class="card">
         <h3>Which board</h3>
         <p><strong>Carrier board.</strong> The shift light as it ships: a 54 &times; 58 mm board with an ESP32-C3 SuperMini soldered in the middle, USB-C at the top. Plug the cable into the SuperMini. A bare SuperMini on the bench takes the same build.</p>
-        <p><strong>Prototype.</strong> A Waveshare ESP32-S3-Zero wired to a CAN breakout and the strip. Plug into the S3-Zero's USB-C.</p>
-        <p>Either way the page reads the chip and picks the build itself. Flash it on the bench, disconnected from the car.</p>
+        <p>The page reads the chip and picks the build itself. Flash it on the bench, disconnected from the car.</p>
       </div>
 
       <div class="card">
         <h3>After flashing</h3>
         <ol>
-          <li>The board restarts on its own. Away from the car, the status LED blinks: on the carrier board the blue LED on the SuperMini blinks once a second, on the S3-Zero it blinks red. That's "no CAN", which is what it should say on the bench.</li>
+          <li>The board restarts on its own. Away from the car, the blue status LED on the SuperMini blinks once a second. That's "no CAN", which is what it should say on the bench.</li>
           <li>Open the app and connect: the <a href="https://mrblahhhh.github.io/car/tech/2026/07/11/r53-esp32-shift-light.html#getting-the-app" target="_blank" rel="noopener">Android app</a>, or <a href="https://logs.geekopolis.com/shiftlight/" target="_blank" rel="noopener">logs.geekopolis.com/shiftlight</a> in Chrome (Bluefy on an iPhone). There's no pairing and no PIN.</li>
           <li>After a fresh install it runs the default thresholds and colours. Set yours and press <strong>Save</strong>. An update keeps what was saved.</li>
         </ol>
@@ -104,8 +103,8 @@
         <ul>
           <li>Use a USB <strong>data</strong> cable. A lot of USB-C cables are charge-only and the board never shows up.</li>
           <li>Close anything else holding the port: a serial monitor, PlatformIO, the Arduino IDE, another flasher tab.</li>
-          <li>Force the bootloader: hold <strong>BOOT</strong>, tap <strong>RST</strong> (RESET on the S3-Zero), let go of BOOT, then press Connect again. Plugging the cable in while holding BOOT does the same. On the carrier board both buttons are on the SuperMini, next to the USB-C.</li>
-          <li>No driver needed. Both boards use the chip's own USB. In the port list it's usually "USB JTAG/serial debug unit" or "USB Serial Device".</li>
+          <li>Force the bootloader: hold <strong>BOOT</strong>, tap <strong>RST</strong>, let go of BOOT, then press Connect again. Plugging the cable in while holding BOOT does the same. On the carrier board both buttons are on the SuperMini, next to the USB-C.</li>
+          <li>No driver needed. The C3 uses its own USB. In the port list it's usually "USB JTAG/serial debug unit" or "USB Serial Device".</li>
           <li>Chrome and Edge on a computer can do this. Firefox and Safari can't, and neither can a phone.</li>
         </ul>
       </div>

@@ -1,6 +1,9 @@
 #pragma once
 #include <stdint.h>
 
+// The strip. The K-line + CAN bridge builds this same file; keep the two copies
+// identical (see README, "Shared with the bridge").
+
 void shiftlightBegin();
 void shiftlightRender(uint16_t rpm);   // compute + push pixels; call at LED_HZ
 void shiftlightIdentify();             // brief flash, to tell two boards apart

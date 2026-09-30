@@ -9,8 +9,8 @@ import { CustomReset, ESPLoader, Transport } from "https://cdn.jsdelivr.net/npm/
 const BAUD_FLASH = 921600;
 const BAUD_ROM = 115200;
 
-// Pulse EN with the boot strap (GPIO9 on the C3, GPIO0 on the S3) left high,
-// so the chip boots its firmware. Both boards use the chip's own USB-Serial/JTAG,
+// Pulse EN with the boot strap (GPIO9 on the C3) left high, so the chip boots
+// its firmware. The C3 uses the chip's own USB-Serial/JTAG,
 // where RTS drives EN and DTR the strap. esptool-js 0.7.0's HardReset only
 // drops RTS, which is already low after its bootloader reset, so on its own it
 // resets nothing and the board stays in the ROM bootloader.
@@ -28,24 +28,13 @@ const BOARDS = {
     ledText: "the blue LED on the SuperMini blinks once a second",
     art: moduleArt("C3", "#1b3a8a"),
   },
-  "esp32-s3-zero": {
-    name: "Prototype",
-    module: "Waveshare ESP32-S3-Zero",
-    chip: "ESP32-S3",
-    flashMB: 4,
-    spec: "ESP32-S3 · 4 MB flash · 2 MB PSRAM",
-    blurb: "The loose-parts build: S3-Zero, CAN breakout and strip on jumper wires.",
-    ledText: "the LED on the S3-Zero blinks red",
-    art: moduleArt("S3", "#111827"),
-  },
 };
 
-// The C3 SuperMini only comes as the ESP32-C3FH4, and the S3-Zero is an
-// ESP32-S3FH4R2. Anything else is some other board and gets refused, unless
-// someone picks by hand.
+// The C3 SuperMini only comes as the ESP32-C3FH4. Anything else is some other
+// board and gets refused, unless someone picks by hand. The S3-Zero prototype
+// was retired on 2026-09-29; build 1 in releases.json still carries its images.
 function boardForChip(chip) {
   if (chip.name === "ESP32-C3" && chip.flashMB === 4) return "esp32-c3";
-  if (chip.name === "ESP32-S3" && chip.flashMB === 4 && chip.psramMB === 2) return "esp32-s3-zero";
   return null;
 }
 

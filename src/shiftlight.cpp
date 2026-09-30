@@ -3,22 +3,19 @@
 #include <Arduino.h>
 #include <FastLED.h>
 
-// From platformio.ini only. No fallback: on the carrier GPIO5 is the CAN
-// transceiver's TXD, and a guessed pin could clock LED data onto the car's bus.
+// From platformio.ini only, where each board's pin is explained. No fallback:
+// a guessed pin could be the CAN transceiver's TXD and clock LED data onto the
+// car's bus.
 #ifndef LED_GPIO
 #error "LED_GPIO is not defined; set it in platformio.ini"
 #endif
 #ifndef STATUS_LED_MODE
 #define STATUS_LED_MODE 0
 #endif
+// The board's own LED: 0 none, 1 a plain LED. Pin and polarity per board, in
+// platformio.ini.
 #ifndef STATUS_LED_ACTIVE_LOW
 #define STATUS_LED_ACTIVE_LOW 0
-#endif
-// The S3-Zero's onboard pixel is RGB-ordered, unlike the GRB strip on LED_GPIO.
-// Get this wrong and red and green swap while blue looks right, because blue is
-// the last byte either way.
-#ifndef STATUS_LED_ORDER
-#define STATUS_LED_ORDER RGB
 #endif
 
 // Each threshold switches on exactly where it is set and back off only this far
@@ -33,15 +30,13 @@ static uint16_t s_heldRpm      = 0;   // what the strip is drawn from
 static uint32_t s_blinkRenders = 0;   // renders since the blink started
 
 // Identify runs inside the render, not in delay()s: blocking the loop for its
-// 720 ms stopped CAN capture and both BLE services with it (BUGS.md B1).
+// 720 ms stopped CAN capture and BLE with it, and on the bridge the K-line
+// rotation too (esp32-shift-light-R53-mini BUGS.md B1).
 #define IDENTIFY_FLASHES 3
 #define IDENTIFY_HALF_MS 120
 static uint32_t s_identifyStartMs = 0;
 static bool     s_identifying     = false;
 
-#if STATUS_LED_MODE == 2
-static CRGB s_status[1];
-#endif
 
 void shiftlightBegin() {
   // The controller is created for the full buffer, not cfg.numLeds. FastLED
@@ -171,16 +166,12 @@ void shiftlightIdentify() {
 // --- Status indicator -------------------------------------------------------
 // Steady = CAN up, meaning a frame heard in the last CAN_SILENT_MS. 1 Hz blink =
 // CAN down, which from the driver's seat looks like "engine off" until you
-// look. Dark = no power or no firmware running. BLE state is shown only on the
-// addressable variant, where it can have a colour of its own.
+// look. Dark = no power or no firmware running.
 
 void statusBegin() {
 #if STATUS_LED_MODE == 1
   pinMode(STATUS_LED_PIN, OUTPUT);
   digitalWrite(STATUS_LED_PIN, STATUS_LED_ACTIVE_LOW ? HIGH : LOW);
-#elif STATUS_LED_MODE == 2
-  FastLED.addLeds<WS2812B, STATUS_LED_PIN, STATUS_LED_ORDER>(s_status, 1);
-  s_status[0] = CRGB::Black;
 #endif
 }
 
@@ -189,15 +180,6 @@ void statusUpdate(bool canOk, bool bleConnected) {
   (void)bleConnected;
   bool on = canOk || ((millis() / 500) & 1) == 0;   // lit while up, so dark means dead
   digitalWrite(STATUS_LED_PIN, (on != (bool)STATUS_LED_ACTIVE_LOW) ? HIGH : LOW);
-#elif STATUS_LED_MODE == 2
-  // Near-full channel values on purpose. FastLED's master brightness is global
-  // and set from cfg.brightness for the strip, so anything subtle here gets
-  // scaled down with it and disappears at the low brightness the strip wants.
-  if (!canOk) {
-    s_status[0] = (((millis() / 500) & 1) == 0) ? CRGB(255, 0, 0) : CRGB::Black;
-  } else {
-    s_status[0] = bleConnected ? CRGB(0, 0, 200) : CRGB(0, 140, 0);
-  }
 #else
   (void)canOk; (void)bleConnected;
 #endif

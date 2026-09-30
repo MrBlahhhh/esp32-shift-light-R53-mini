@@ -15,18 +15,10 @@ and the LEDs.
 
 ## Hardware
 
-Two builds, one firmware. The pin map below is identical on both.
+The Waveshare ESP32-S3-Zero prototype was retired on 2026-09-29; its last firmware is build 1 on the web flasher, from `5574d94`.
 
-The **prototype** is loose parts, and it is the one still in the car:
-
-| Part | Qty | Notes |
-|---|---:|---|
-| Waveshare ESP32-S3-Zero | 1 | ESP32-S3FH4R2 — 4 MB flash, 2 MB quad PSRAM |
-| SN65HVD230 CAN breakout | 1 | blue screw-terminal type |
-| 8 × WS2812B strip | 1 | the shift light itself |
-
-There is also a **54 × 58 mm carrier board** that replaces the dev board, the CAN
-breakout, the buck module and the jumper-wire harness between them, with an
+The shift light is a **54 × 58 mm carrier board** that replaced that prototype's
+dev board, CAN breakout, buck module and jumper-wire harness, with an
 **ESP32-C3 SuperMini** soldered flat in the middle and a D-SUN MP1584 buck on
 four through-holes at the top. **Its design files are not in this repo.**
 
@@ -39,7 +31,7 @@ four through-holes at the top. **Its design files are not in this repo.**
 
 ### Pin map
 
-Strip and CAN pins are identical on both boards.
+The carrier kept the prototype's strip and CAN pins.
 
 | GPIO | Goes to |
 |---|---|
@@ -47,12 +39,7 @@ Strip and CAN pins are identical on both boards.
 | `5` | SN65HVD230 `TXD` |
 | `6` | SN65HVD230 `RXD` |
 
-Status LED differs by module:
-
-| Board | GPIO | LED type |
-|---|---|---|
-| Carrier (C3 SuperMini) | `8` | plain blue LED on the module, active low |
-| Prototype (S3-Zero) | `21` | addressable WS2812 on the module |
+The status LED is the C3 SuperMini's plain blue LED on GPIO `8`, active low.
 
 `TXD` and `RXD` go **straight across, not crossed**. On the transceiver `TXD`
 is an input the micro drives and `RXD` is an output. Swapping them is the
@@ -63,16 +50,10 @@ On the **C3 SuperMini**, component side up with USB-C at the top: the right edge
 IO5, IO6, IO7, IO8, IO9, IO10, IO20, IO21. IO4 is the strip, IO5 CAN TX, IO6
 CAN RX. IO8 and IO9 (BOOT) stay on the module.
 
-On the **S3-Zero**, GPIO19 and GPIO20 are the native USB pair and are left
-alone. The onboard LED is a WS2812, not a plain one, so it is driven as a
-one-pixel strip (`STATUS_LED_MODE=2`). Driving it with `digitalWrite` leaves it
-dark or stuck on whatever colour the first stray pulse happened to clock in.
-
 The status LED shows whether CAN is up, and up means a frame heard in the last
 500 ms. The TWAI driver says it's running on a dead or unplugged bus, so its
-state isn't the test. On the S3-Zero: green = CAN up, blue = CAN up and a phone
-connected, blinking red = CAN down. On the C3's plain LED: steady = CAN up,
-1 Hz blink = CAN down, dark = no power or no firmware running. The app's "CAN
+state isn't the test. Steady = CAN up, 1 Hz blink = CAN down, dark = no power
+or no firmware running. The app's "CAN
 down" uses the same 500 ms test.
 
 The node is **listen-only**, and that takes two things. `TWAI_MODE_LISTEN_ONLY`
@@ -85,14 +66,11 @@ platform is pinned (see [Firmware](#firmware)).
 
 ## Firmware
 
-PlatformIO, two envs — one per module:
+PlatformIO, one env:
 
 ```sh
 # Carrier board (ESP32-C3 SuperMini)
 pio run -e esp32-c3 -t upload
-
-# Prototype (Waveshare ESP32-S3-Zero, still in the car)
-pio run -e esp32-s3-zero -t upload
 
 pio device monitor
 ```
@@ -101,11 +79,8 @@ To flash without PlatformIO, from Chrome or Edge, there's a web flasher in
 [`web-flasher/`](web-flasher/README.md). It detects which board it's talking
 to and also handles a batch.
 
-There is no stock `esp32-s3-fh4r2` board in the platform — the older repos in
-this family pointed at a community board JSON. `esp32-s3-devkitc1-n4r2` is the
-stock definition for the same silicon (N4 = 4 MB flash, R2 = 2 MB quad PSRAM),
-which is what the chip reports. The C3 env uses `esp32-c3-devkitm-1`, which
-matches the SuperMini's pinout close enough.
+The env uses `esp32-c3-devkitm-1`, which matches the SuperMini's pinout close
+enough.
 
 The platform is pinned to pioarduino
 [55.03.37](https://github.com/pioarduino/platform-espressif32/releases/tag/55.03.37)

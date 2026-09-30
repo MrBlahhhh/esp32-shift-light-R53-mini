@@ -1,4 +1,4 @@
-# Stage a shift light build for the web flasher: build both envs from the
+# Stage a shift light build for the web flasher: build the env from the
 # committed source, check the images, copy them into the Pages site and add
 # the build to releases.json.
 #
@@ -13,14 +13,15 @@
 # into the firmware, and it runs the build itself rather than trusting
 # whatever is lying in .pio.
 #
-#   .\publish-release.ps1 -Notes "Silent app handshake"      next build number, both boards
+#   .\publish-release.ps1 -Notes "Silent app handshake"      next build number
 #   .\publish-release.ps1 -Build 3 -Notes "..."              replace build 3
 #   .\publish-release.ps1 -Bench -Site C:\tmp\flasher        stage a bench test from the working tree
 #   .\publish-release.ps1 -Envs esp32-c3                     only this board
 
 param(
     [string]$Site = "C:\Projects\esp32-shift-light-R53-mini-pages",
-    [string[]]$Envs = @("esp32-c3", "esp32-s3-zero"),
+    # The S3-Zero prototype was retired on 2026-09-29; build 1 is its last.
+    [string[]]$Envs = @("esp32-c3"),
     [int]$Build = 0,
     [string]$Notes = "",
     [switch]$Bench
@@ -32,7 +33,7 @@ $SourceRepoUrl = "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini"
 
 # Image header byte 12 is the chip id the image was built for. The page picks
 # the folder by chip; this makes sure the folder holds that chip's image.
-$ChipIds = @{ "esp32-c3" = 5; "esp32-s3-zero" = 9 }
+$ChipIds = @{ "esp32-c3" = 5 }
 
 # Run git and return its stdout. Continue, not Stop: Windows PowerShell turns
 # any stderr line from a native program into a terminating error.
