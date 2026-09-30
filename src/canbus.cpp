@@ -67,22 +67,31 @@ static uint16_t satAdd(uint16_t a, uint64_t b) {
 }
 
 // A cursor that has been overwritten is moved to the oldest frame still held.
-// For VTP those lost frames are the definition of §8.3's `dropped`: the device
-// accepted them — a subscription asked for them and its mode selected them —
-// and then discarded them because it could not keep up.
-static void catchUp(uint64_t& tail, uint16_t* dropped) {
+// VTP's losses are not counted here: see ringPush().
+static void catchUp(uint64_t& tail) {
   if (s_head - tail <= RING_SIZE) return;
-  uint64_t lost = (s_head - RING_SIZE) - tail;
   tail = s_head - RING_SIZE;
-  if (dropped) *dropped = satAdd(*dropped, lost);
 }
 
 static void ringPush(const twai_message_t& m, uint64_t tsUs, uint8_t want) {
+  // §8.3's `dropped` is frames VTP accepted and then lost, so it is counted
+  // here, while the record being overwritten still says who wanted it. Counting
+  // every overwritten slot at read time charged VTP for frames only the app's
+  // own stream had asked for (§6.3).
+  if (s_head >= RING_SIZE) {
+    const uint64_t oldest = s_head - RING_SIZE;
+    if (s_tailVtp <= oldest && (s_ring[oldest % RING_SIZE].want & CAN_WANT_VTP)) {
+      s_vtpDropped = satAdd(s_vtpDropped, 1);
+    }
+  }
   CapFrame& r = s_ring[s_head % RING_SIZE];
   r.tsUs = tsUs;
   r.id   = m.identifier;
   r.ext  = m.extd ? 1 : 0;
-  r.len  = m.data_length_code > 8 ? 8 : m.data_length_code;
+  // A remote frame asks for data and carries none: its DLC is the length
+  // requested, and VTP §6.4-6.5 sends it flagged with no payload.
+  r.rtr  = m.rtr ? 1 : 0;
+  r.len  = m.rtr ? 0 : (m.data_length_code > 8 ? 8 : m.data_length_code);
   r.want = want;
   memset(r.data, 0, sizeof(r.data));
   memcpy(r.data, m.data, r.len);
@@ -171,7 +180,8 @@ void canPoll() {
     // sat in the rx queue.
     uint64_t tsUs = (uint64_t)esp_timer_get_time();
 
-    bool isRpmFrame = m.identifier == cfg.canRpmId;
+    // A remote frame for the RPM id is a request, not a reading.
+    bool isRpmFrame = !m.rtr && m.identifier == cfg.canRpmId;
     if (isRpmFrame && m.data_length_code >= 4 && cfg.rpmScaleX10 != 0) {
       uint16_t raw = (uint16_t)((m.data[3] << 8) | m.data[2]);
       s_rpm = (uint16_t)((raw * 10UL) / cfg.rpmScaleX10);
@@ -182,6 +192,9 @@ void canPoll() {
     // While simulating, the app's frame stream shows the synthetic RPM frame in
     // place of the car's so the two RPMs never interleave. VTP keeps the real one.
     if (simulating && isRpmFrame) want &= ~CAN_WANT_LEGACY;
+    // The app's own record has no remote flag and would show the request as
+    // data, so remote frames go to VTP only, which can say what they are.
+    if (m.rtr) want &= ~CAN_WANT_LEGACY;
     if (want) ringPush(m, tsUs, want);
   }
 
@@ -211,7 +224,7 @@ size_t canDrainFrames(CanFrameRec* out, size_t max) {
   // No drop count on this side: the …0004 stream has never had a field to
   // report one in, and inventing a behaviour change here would be a protocol
   // change to the thing every shipped app already speaks.
-  catchUp(s_tailLegacy, nullptr);
+  catchUp(s_tailLegacy);
   size_t n = 0;
   while (n < max && s_tailLegacy != s_head) {
     const CapFrame& c = s_ring[s_tailLegacy % RING_SIZE];
@@ -230,7 +243,7 @@ size_t canDrainFrames(CanFrameRec* out, size_t max) {
 // Skips whatever this cursor was not meant to see, and reports the overrun on
 // the way past.
 static bool vtpSeek() {
-  catchUp(s_tailVtp, &s_vtpDropped);
+  catchUp(s_tailVtp);
   while (s_tailVtp != s_head && !(s_ring[s_tailVtp % RING_SIZE].want & CAN_WANT_VTP)) {
     s_tailVtp++;
   }
@@ -248,9 +261,7 @@ void canVtpPop() {
 }
 
 uint16_t canVtpTakeDropped() {
-  // Fold in the overrun before answering, or a batch sent on a quiet moment
-  // reports zero while frames are sitting overwritten behind the cursor.
-  catchUp(s_tailVtp, &s_vtpDropped);
+  // Counted as each frame is overwritten (ringPush), so nothing to fold in here.
   uint16_t d = s_vtpDropped;
   s_vtpDropped = 0;
   return d;
@@ -294,6 +305,11 @@ void canSetStream(uint8_t mode) {
 
 void canSetFilter(const uint32_t* ids, size_t count) {
   if (count > SL_MAX_FILTER) count = SL_MAX_FILTER;
-  memcpy(s_filter, ids, count * sizeof(uint32_t));
+  if (count > 0) memcpy(s_filter, ids, count * sizeof(uint32_t));
   s_filterCount = count;
+}
+
+void canInvalidateRpm() {
+  s_rpm = 0;
+  s_lastRpmMs = 0;
 }

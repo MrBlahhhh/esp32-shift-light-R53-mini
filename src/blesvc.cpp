@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <freertos/queue.h>
+#include <atomic>
 #include <string.h>
 #include "vtp1_generated.h"   // VTP_SERVICE_UUID, for the scan response
 
@@ -31,11 +32,20 @@ static volatile uint16_t s_mtu = 23;
 // the connection.
 enum : uint8_t { WRITE_CONFIG, WRITE_COMMAND };
 struct PhoneWrite {
+  uint32_t session;                      // s_session when it was queued
   uint8_t target;                        // WRITE_CONFIG or WRITE_COMMAND
   uint8_t len;                           // clamped to sizeof(bytes)
   uint8_t bytes[1 + SL_MAX_FILTER * 4];  // the longest write either accepts
 };
 static QueueHandle_t s_phoneWrites = nullptr;
+
+// Bumped on the host task when a connection ends, and seen by blePoll() on the
+// loop. The end of a session used to be a queued stream-off, which a full queue
+// dropped, leaving the stream on for the next client (BUGS.md B2). A counter
+// cannot be dropped, and each write carries the one it was queued under, so a
+// retired connection's own stream commands cannot reopen its stream either.
+static std::atomic<uint32_t> s_session{0};
+static uint32_t s_appliedSession = 0;
 
 // Set on the host task when a config write from an unverified app is refused,
 // cleared by blePoll() once it has put the running config back.
@@ -44,6 +54,7 @@ static volatile bool s_republishConfig = false;
 static void queueWrite(uint8_t target, const uint8_t* bytes, size_t len) {
   if (!s_phoneWrites) return;
   PhoneWrite w = {};
+  w.session = s_session.load();
   w.target = target;
   w.len    = len > sizeof(w.bytes) ? sizeof(w.bytes) : (uint8_t)len;
   memcpy(w.bytes, bytes, w.len);
@@ -91,10 +102,8 @@ class ServerCallbacks : public NimBLEServerCallbacks {
     s_connected = false;
     appVerifyOnDisconnect(info.getConnHandle());
     // Streaming is per-connection state; left on, the next client inherits a
-    // backlog from someone else's session. Queued like the phone's own
-    // stream-off so it lands after anything that phone wrote before it left.
-    const uint8_t streamOff[] = { SL_CMD_STREAM, SL_STREAM_OFF };
-    queueWrite(WRITE_COMMAND, streamOff, sizeof(streamOff));
+    // backlog from someone else's session. blePoll() turns it off on seeing this.
+    s_session.fetch_add(1);
     vtpOnDisconnect();
     Serial.println("BLE: disconnected, advertising again");
     NimBLEDevice::startAdvertising();
@@ -149,8 +158,23 @@ class CommandCallbacks : public NimBLECharacteristicCallbacks {
 
 // --- Phone writes, applied on the loop --------------------------------------
 
+// A new id or scale makes the reading in hand the old source's; shown as fresh
+// it would light the strip for an id that has sent nothing (BUGS.md S1).
+static void forgetRpmIfSourceChanged(const ConfigBlob& before) {
+  if (before.canRpmId != cfg.canRpmId || before.rpmScaleX10 != cfg.rpmScaleX10) {
+    canInvalidateRpm();
+  }
+}
+
+static bool isStreamCommand(const PhoneWrite& w) {
+  return w.target == WRITE_COMMAND && w.len >= 1 &&
+         (w.bytes[0] == SL_CMD_STREAM || w.bytes[0] == SL_CMD_FILTER);
+}
+
 static void applyConfig(const PhoneWrite& w) {
+  const ConfigBlob before = cfg;
   if (settingsApply(w.bytes, w.len)) {
+    forgetRpmIfSourceChanged(before);
     Serial.println("BLE: config applied (not yet saved)");
   } else {
     Serial.printf("BLE: config rejected (%u bytes)\n", (unsigned)w.len);
@@ -171,10 +195,13 @@ static void applyCommand(const PhoneWrite& w) {
       blePublishConfig();
       break;
 
-    case SL_CMD_DEFAULTS:
+    case SL_CMD_DEFAULTS: {
+      const ConfigBlob before = cfg;
       settingsDefaults();
+      forgetRpmIfSourceChanged(before);
       blePublishConfig();
       break;
+    }
 
     case SL_CMD_STREAM:
       if (w.len >= 2) canSetStream(p[1]);
@@ -294,8 +321,17 @@ void bleBegin() {
 bool bleConnected() { return s_connected; }
 
 void blePoll(uint16_t rpm) {
+  // A connection has ended since the last pass: its stream and filter end with it.
+  const uint32_t session = s_session.load();
+  if (session != s_appliedSession) {
+    s_appliedSession = session;
+    canSetStream(SL_STREAM_OFF);
+    canSetFilter(nullptr, 0);
+  }
   PhoneWrite w;
   while (s_phoneWrites && xQueueReceive(s_phoneWrites, &w, 0) == pdTRUE) {
+    // Config and saves still land; they were verified when they were written.
+    if (w.session != session && isStreamCommand(w)) continue;
     if (w.target == WRITE_CONFIG) applyConfig(w);
     else                          applyCommand(w);
   }

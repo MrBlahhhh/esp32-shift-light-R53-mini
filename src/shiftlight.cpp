@@ -32,6 +32,13 @@ static uint8_t  s_level        = 0;
 static uint16_t s_heldRpm      = 0;   // what the strip is drawn from
 static uint32_t s_blinkRenders = 0;   // renders since the blink started
 
+// Identify runs inside the render, not in delay()s: blocking the loop for its
+// 720 ms stopped CAN capture and both BLE services with it (BUGS.md B1).
+#define IDENTIFY_FLASHES 3
+#define IDENTIFY_HALF_MS 120
+static uint32_t s_identifyStartMs = 0;
+static bool     s_identifying     = false;
+
 #if STATUS_LED_MODE == 2
 static CRGB s_status[1];
 #endif
@@ -65,9 +72,26 @@ static uint16_t holdRpm(uint16_t engineRpm) {
   return s_heldRpm;
 }
 
+// True while an identify flash owns the strip, having drawn this render of it.
+static bool renderIdentify(uint8_t n) {
+  if (!s_identifying) return false;
+  uint32_t elapsed = millis() - s_identifyStartMs;
+  if (elapsed >= IDENTIFY_FLASHES * 2 * IDENTIFY_HALF_MS) {
+    s_identifying = false;
+    return false;
+  }
+  bool on = (elapsed / IDENTIFY_HALF_MS) % 2 == 0;
+  fill_solid(s_leds, SL_MAX_LEDS, CRGB::Black);
+  if (on) fill_solid(s_leds, n, CRGB::White);
+  FastLED.setBrightness(cfg.brightness);
+  FastLED.show();
+  return true;
+}
+
 void shiftlightRender(uint16_t engineRpm) {
   uint16_t rpm = holdRpm(engineRpm);
   uint8_t n = cfg.numLeds > SL_MAX_LEDS ? SL_MAX_LEDS : cfg.numLeds;
+  if (renderIdentify(n)) return;
   bool mirrored = cfg.flags & SL_FLAG_MIRRORED;
 
   // In mirrored mode a "slot" is a pair lit from both ends inward, so an odd
@@ -140,15 +164,8 @@ void shiftlightRender(uint16_t engineRpm) {
 uint8_t shiftlightLevel() { return s_level; }
 
 void shiftlightIdentify() {
-  uint8_t n = cfg.numLeds > SL_MAX_LEDS ? SL_MAX_LEDS : cfg.numLeds;
-  for (int flash = 0; flash < 3; flash++) {
-    fill_solid(s_leds, n, CRGB::White);
-    FastLED.show();
-    delay(120);
-    fill_solid(s_leds, SL_MAX_LEDS, CRGB::Black);
-    FastLED.show();
-    delay(120);
-  }
+  s_identifyStartMs = millis();
+  s_identifying = true;
 }
 
 // --- Status indicator -------------------------------------------------------

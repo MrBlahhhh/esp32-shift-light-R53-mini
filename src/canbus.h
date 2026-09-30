@@ -27,6 +27,7 @@ struct CapFrame {
   uint64_t tsUs;     // device clock at capture — see the note in canPoll()
   uint32_t id;       // arbitration id only; no format or RTR bits packed in
   uint8_t  ext;      // 29-bit identifier
+  uint8_t  rtr;      // remote frame: a request carrying no data, so len is 0
   uint8_t  len;      // 0..8
   uint8_t  want;     // CAN_WANT_* — who asked for this frame
   uint8_t  data[8];
@@ -54,6 +55,10 @@ void     canVtpReset();               // drop the backlog and the drop count
 // RPM read-out agree with the strip. It goes to the app's stream only, never to
 // VTP, and does not count towards canUp().
 void canInjectSimulated(uint16_t rpm);
+
+// The RPM source (id or scale) changed: forget the old reading rather than show
+// it as fresh for an id that has sent nothing yet.
+void canInvalidateRpm();
 
 #define RPM_STALE_MS 2000
 // A running R53 bus carries 0x316 alone at ~100 Hz, so half a second without

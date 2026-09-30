@@ -521,6 +521,7 @@ static void canFlush() {
     fr[n].dt       = (uint16_t)dt;
     fr[n].id       = c.id & 0x1FFFFFFFu;
     fr[n].extended = c.ext ? 1 : 0;
+    fr[n].rtr      = c.rtr ? 1 : 0;       // len is already 0 for one (ringPush)
     fr[n].len      = c.len;
     fr[n].payload  = cap[n].data;
     fr[n].t_device = c.tsUs;

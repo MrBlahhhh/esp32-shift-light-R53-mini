@@ -490,7 +490,13 @@ function checkChipAgainstPick(boardKey) {
   if (state.chip.name !== board.chip) {
     throw new Refusal(`This is an ${state.chip.name}, and the ${board.name} image is for an ${board.chip}.`);
   }
-  if (state.chip.flashMB && state.chip.flashMB < board.flashMB) {
+  // Unknown size (readChip() turns an undetected size into 0) stops here too:
+  // it is the one check between a hand pick and an erase, and "unknown" is not
+  // "big enough" (BUGS.md F1).
+  if (!state.chip.flashMB) {
+    throw new Refusal(`Couldn't read how much flash this chip has, so there's no telling whether the ${board.name} image fits. Unplug the board, plug it back in and press Connect again.`);
+  }
+  if (state.chip.flashMB < board.flashMB) {
     throw new Refusal(`This chip has ${state.chip.flashMB} MB of flash and the ${board.name} image needs ${board.flashMB} MB.`);
   }
   if (!state.pickedManually && detected !== boardKey) {
