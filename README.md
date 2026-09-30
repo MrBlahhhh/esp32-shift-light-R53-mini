@@ -82,6 +82,15 @@ to and also handles a batch.
 The env uses `esp32-c3-devkitm-1`, which matches the SuperMini's pinout close
 enough.
 
+### Shared with the bridge
+
+The K-line + CAN bridge (`R53_Mini_Kline_Canbus_Logger_Shiftlight`, rev C
+carrier) runs this shift light too, so the R53 Shift app sets up either board.
+It builds byte-identical copies of `proto.h`, `appkey.h`, `appverify.h/.cpp`,
+`settings.h/.cpp` and `shiftlight.h/.cpp`; its `slsvc.cpp` takes the place of
+`blesvc.cpp` and `canbus.cpp`, because the bridge owns the BLE server and the
+CAN driver. Change those files here and copy them across in the same sitting.
+
 The platform is pinned to pioarduino
 [55.03.37](https://github.com/pioarduino/platform-espressif32/releases/tag/55.03.37)
 (Arduino core 3.3.7, IDF 5.5.2), whose prebuilt sdkconfig has the listen-only
