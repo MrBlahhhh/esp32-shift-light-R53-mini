@@ -1,6 +1,8 @@
-# Stage a shift light build for the web flasher: build the env from the
-# committed source, check the images, copy them into the Pages site and add
-# the build to releases.json.
+# Stage a build for the web flasher: build each board's env from its committed
+# source, check the images, copy them into the Pages site and add the build to
+# releases.json. Two boards, two repos: the shift light's carrier board from
+# this one, and the K-line + CAN bridge (rev C, XIAO ESP32-S3) from
+# R53_Mini_Kline_Canbus_Logger_Shiftlight, found at -BridgeRepo.
 #
 # What it writes into -Site (the gh-pages worktree, see README.md):
 #
@@ -13,15 +15,17 @@
 # into the firmware, and it runs the build itself rather than trusting
 # whatever is lying in .pio.
 #
-#   .\publish-release.ps1 -Notes "Silent app handshake"      next build number
+#   .\publish-release.ps1 -Notes "Silent app handshake"      next build number, both boards
 #   .\publish-release.ps1 -Build 3 -Notes "..."              replace build 3
 #   .\publish-release.ps1 -Bench -Site C:\tmp\flasher        stage a bench test from the working tree
 #   .\publish-release.ps1 -Envs esp32-c3                     only this board
+#   .\publish-release.ps1 -Envs xiao_esp32s3                 only the bridge
 
 param(
     [string]$Site = "C:\Projects\esp32-shift-light-R53-mini-pages",
     # The S3-Zero prototype was retired on 2026-09-29; build 1 is its last.
-    [string[]]$Envs = @("esp32-c3"),
+    [string[]]$Envs = @("esp32-c3", "xiao_esp32s3"),
+    [string]$BridgeRepo = "C:\Projects\R53_Mini_Kline_Canbus_Logger_Shiftlight",
     [int]$Build = 0,
     [string]$Notes = "",
     [switch]$Bench
@@ -31,15 +35,31 @@ $ErrorActionPreference = "Stop"
 $Repo = Split-Path $PSScriptRoot -Parent
 $SourceRepoUrl = "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini"
 
-# Image header byte 12 is the chip id the image was built for. The page picks
-# the folder by chip; this makes sure the folder holds that chip's image.
-$ChipIds = @{ "esp32-c3" = 5 }
+# Each board: the PlatformIO project it builds from, the chip id in its image
+# header (byte 12; the page picks the folder by chip, and this makes sure the
+# folder holds that chip's image), the app's file name, and the repo its source
+# link points at, when that repo is public. The bridge's is private, so the page
+# gets its commit and no link. The bridge also reports its own firmware number,
+# which is how a board on the car is identified, from CAPS_FIRMWARE_BUILD.
+$Targets = [ordered]@{
+    "esp32-c3" = @{
+        Dir = $Repo; ChipId = 5; Prefix = "shiftlight"; RepoUrl = $SourceRepoUrl; Public = $true
+    }
+    "xiao_esp32s3" = @{
+        Dir = (Join-Path $BridgeRepo "firmware\esp32_shiftlight_wideband"); ChipId = 9; Prefix = "bridge"
+        RepoUrl = "https://github.com/MrBlahhhh/R53_Mini_Kline_Canbus_Logger_Shiftlight"; Public = $false
+        BuildFile = "src\main.cpp"; BuildPattern = '#define CAPS_FIRMWARE_BUILD\s+(\d+)'
+    }
+}
+foreach ($envName in $Envs) {
+    if (-not $Targets.Contains($envName)) { throw "no target for $envName; add it to `$Targets" }
+}
 
 # Run git and return its stdout. Continue, not Stop: Windows PowerShell turns
 # any stderr line from a native program into a terminating error.
-function Run-Git {
+function Run-Git([string]$Dir) {
     $ErrorActionPreference = "Continue"
-    $out = & git.exe -C $Repo @args 2>$null
+    $out = & git.exe -C $Dir @args 2>$null
     return @{ Out = $out; Ok = ($LASTEXITCODE -eq 0) }
 }
 
@@ -73,31 +93,38 @@ function Check-Image([string]$path, [int]$chipId) {
 
 # ---------------------------------------------------------------- source
 
-$sourceCommit = $null
-$dirty = Run-Git status --porcelain -- src include lib platformio.ini
-if ($dirty.Out) {
-    Write-Host "Uncommitted changes that go into the firmware:"
-    $dirty.Out | ForEach-Object { Write-Host "  $_" }
-    if (-not $Bench) { throw "commit them first, or use -Bench for a local test" }
+# Per board, since the two come from different repos.
+$commits = @{}
+foreach ($envName in $Envs) {
+    $dir = $Targets[$envName].Dir
+    $dirty = Run-Git $dir status --porcelain -- src include lib platformio.ini
+    if ($dirty.Out) {
+        Write-Host "Uncommitted changes that go into the $envName firmware:"
+        $dirty.Out | ForEach-Object { Write-Host "  $_" }
+        if (-not $Bench) { throw "commit them first, or use -Bench for a local test" }
+    }
+    if (-not $Bench) {
+        $commit = "$((Run-Git $dir rev-parse HEAD).Out)".Trim()
+        $pushed = Run-Git $dir branch -r --contains $commit
+        if (-not $pushed.Out) { Write-Host "WARNING: $envName $($commit.Substring(0, 7)) is not on any remote branch yet. Push it before the page goes live, or its source link is a 404." }
+        $commits[$envName] = $commit
+    }
 }
-if (-not $Bench) {
-    $sourceCommit = "$((Run-Git rev-parse HEAD).Out)".Trim()
-    $pushed = Run-Git branch -r --contains $sourceCommit
-    if (-not $pushed.Out) { Write-Host "WARNING: $($sourceCommit.Substring(0, 7)) is not on any remote branch yet. Push it before the page goes live, or its source link is a 404." }
-}
+# The release-level link is the shift light's, as in builds before the bridge.
+$sourceCommit = $commits["esp32-c3"]
 
 # ---------------------------------------------------------------- build
 
 $pio = Join-Path $env:USERPROFILE ".platformio\penv\Scripts\platformio.exe"
 if (-not (Test-Path $pio)) { $pio = "pio" }
-$pioArgs = @("run", "-d", $Repo)
-foreach ($envName in $Envs) { $pioArgs += @("-e", $envName) }
-Write-Host "Building $($Envs -join ', ')"
-$ErrorActionPreference = "Continue"
-& $pio @pioArgs
-$built = $LASTEXITCODE -eq 0
-$ErrorActionPreference = "Stop"
-if (-not $built) { throw "pio run failed" }
+foreach ($envName in $Envs) {
+    Write-Host "Building $envName"
+    $ErrorActionPreference = "Continue"
+    & $pio run -d $Targets[$envName].Dir -e $envName
+    $built = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = "Stop"
+    if (-not $built) { throw "pio run failed for $envName" }
+}
 
 # The same file `pio run -t upload` writes at 0xe000: otadata with ota_seq 1,
 # which boots app0.
@@ -126,16 +153,16 @@ $boardEntries = [ordered]@{}
 
 foreach ($envName in $Envs) {
     Write-Host "== $envName"
-    if (-not $ChipIds.ContainsKey($envName)) { throw "no chip id for $envName; add it to `$ChipIds" }
-    $dir = Join-Path $Repo ".pio\build\$envName"
+    $target = $Targets[$envName]
+    $dir = Join-Path $target.Dir ".pio\build\$envName"
     $bootloader = Join-Path $dir "bootloader.bin"
     $table = Join-Path $dir "partitions.bin"
     $app = Join-Path $dir "firmware.bin"
     foreach ($path in @($bootloader, $table, $app)) {
         if (-not (Test-Path $path)) { throw "$path is missing; did the build run?" }
     }
-    Check-Image $bootloader $ChipIds[$envName]
-    Check-Image $app $ChipIds[$envName]
+    Check-Image $bootloader $target.ChipId
+    Check-Image $app $target.ChipId
 
     $parts = Read-PartitionTable $table
     foreach ($name in @("nvs", "otadata", "app0")) {
@@ -153,7 +180,7 @@ foreach ($envName in $Envs) {
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir }
     New-Item -ItemType Directory -Force $outDir | Out-Null
     # The app gets the build in its name so a downloaded copy says what it is.
-    $appName = "shiftlight-$envName-build$Build.bin"
+    $appName = "$($target.Prefix)-$envName-build$Build.bin"
     Copy-Item $bootloader -Destination (Join-Path $outDir "bootloader.bin")
     Copy-Item $table -Destination (Join-Path $outDir "partitions.bin")
     Copy-Item $bootApp0 -Destination (Join-Path $outDir "boot_app0.bin")
@@ -193,7 +220,18 @@ foreach ($envName in $Envs) {
     $partMap = [ordered]@{}
     foreach ($name in $parts.Keys) { $partMap[$name] = Hex $parts[$name].Offset }
 
+    $firmwareBuild = $null
+    if ($target.BuildFile) {
+        $match = Select-String -Path (Join-Path $target.Dir $target.BuildFile) -Pattern $target.BuildPattern
+        if (-not $match) { throw "no firmware build number in $($target.BuildFile)" }
+        $firmwareBuild = [int]$match.Matches[0].Groups[1].Value
+        Write-Host "  firmware build $firmwareBuild"
+    }
+
     $boardEntries[$envName] = [ordered]@{
+        sourceRepo = $(if ($target.Public) { $target.RepoUrl } else { $null })
+        sourceCommit = $commits[$envName]
+        firmwareBuild = $firmwareBuild
         partitionTable = [ordered]@{ offset = "0x8000"; size = (Get-Item $table).Length; md5 = Hash $table MD5 }
         partitions = $partMap
         update = $update

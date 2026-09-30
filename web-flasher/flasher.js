@@ -1,6 +1,7 @@
-// R53 shift light flasher. Talks to the board over Web Serial with esptool-js,
-// works out which build it takes from the chip, and writes a build listed in
-// releases.json (made by publish-release.ps1).
+// R53 flasher, for the shift light's carrier board and the K-line + CAN bridge.
+// Talks to the board over Web Serial with esptool-js, works out which board it
+// is from the chip and which published build it is running from its flash, and
+// writes a build listed in releases.json (made by publish-release.ps1).
 
 // Pinned to an exact version: a flasher that changes under us between two
 // visits is the last thing that should happen to a board.
@@ -9,8 +10,8 @@ import { CustomReset, ESPLoader, Transport } from "https://cdn.jsdelivr.net/npm/
 const BAUD_FLASH = 921600;
 const BAUD_ROM = 115200;
 
-// Pulse EN with the boot strap (GPIO9 on the C3) left high, so the chip boots
-// its firmware. The C3 uses the chip's own USB-Serial/JTAG,
+// Pulse EN with the boot strap (GPIO9 on the C3, GPIO0 on the S3) left high, so
+// the chip boots its firmware. Both boards use the chip's own USB-Serial/JTAG,
 // where RTS drives EN and DTR the strap. esptool-js 0.7.0's HardReset only
 // drops RTS, which is already low after its bootloader reset, so on its own it
 // resets nothing and the board stays in the ROM bootloader.
@@ -20,21 +21,44 @@ const RUN_FIRMWARE_RESET = "D0|R1|W200|R0|W200";
 const BOARDS = {
   "esp32-c3": {
     name: "Carrier board",
+    short: "carrier",
     module: "ESP32-C3 SuperMini",
     chip: "ESP32-C3",
     flashMB: 4,
     spec: "ESP32-C3 · 4 MB flash",
     blurb: "The shift light board with the C3 SuperMini soldered on. A bare SuperMini takes the same build.",
     ledText: "the blue LED on the SuperMini blinks once a second",
+    keepsText: "Thresholds, colours and brightness you saved stay as they are.",
+    freshText: "It's restarting on the default settings. Set it up in the app and press Save.",
     art: moduleArt("C3", "#1b3a8a"),
+  },
+  // The rev C K-line + CAN carrier. Firmware from R53_Mini_Kline_Canbus_Logger_Shiftlight.
+  "xiao_esp32s3": {
+    name: "K-line + CAN bridge",
+    short: "bridge",
+    module: "Seeed XIAO ESP32-S3",
+    chip: "ESP32-S3",
+    flashMB: 8,
+    spec: "ESP32-S3 · 8 MB flash · 8 MB PSRAM",
+    blurb: "The rev C K-line + CAN carrier with the XIAO soldered flat: K-line, CAN, wideband and the shift light.",
+    ledText: "the orange LED on the XIAO blinks once a second",
+    keepsText: "The K-line polling set and the shift light settings you saved stay as they are.",
+    freshText: "It's restarting on the defaults. Set up the shift light in the R53 Shift app and the K-line polling from R53 Logger.",
+    art: moduleArt("S3", "#2b2f36"),
   },
 };
 
-// The C3 SuperMini only comes as the ESP32-C3FH4. Anything else is some other
-// board and gets refused, unless someone picks by hand. The S3-Zero prototype
-// was retired on 2026-09-29; build 1 in releases.json still carries its images.
+// How many published builds Connect checks the board's app against. Each is one
+// md5 of the app region, well under a second with the stub.
+const RUNNING_CHECK_MAX = 6;
+
+// The C3 SuperMini only comes as the ESP32-C3FH4, and the XIAO ESP32-S3 is an
+// ESP32-S3R8: 8 MB flash, 8 MB PSRAM. Anything else is some other board and
+// gets refused, unless someone picks by hand. The S3-Zero prototype (4 MB, 2 MB
+// PSRAM) was retired on 2026-09-29; build 1 in releases.json still carries it.
 function boardForChip(chip) {
   if (chip.name === "ESP32-C3" && chip.flashMB === 4) return "esp32-c3";
+  if (chip.name === "ESP32-S3" && chip.flashMB === 8 && chip.psramMB === 8) return "xiao_esp32s3";
   return null;
 }
 
@@ -152,7 +176,41 @@ async function readChip(loader) {
     psramMB: psram ? parseInt(psram[1], 10) : 0,
     mac: await loader.chip.readMac(loader),
     tableMd5: null,
+    runningBuild: null,  // the published build whose app is on the flash, if any
   };
+}
+
+// Which published build's app is on the board, by the md5 of each build's app
+// where the app lives. That is what tells an upgrade from a reinstall. Only
+// asked when the partition table is this firmware's: another layout cannot be
+// running one of these builds.
+async function runningBuild(loader, boardKey) {
+  if (!state.manifest) return null;
+  const releases = state.manifest.releases.filter((release) => release.boards[boardKey]);
+  for (const release of releases.slice(0, RUNNING_CHECK_MAX)) {
+    const app = release.boards[boardKey].update.find((file) => file.what === "app");
+    if (!app) continue;
+    const onFlash = await loader.flashMd5sum(parseInt(app.offset, 16), app.size);
+    if (onFlash === app.md5) return release.build;
+  }
+  return null;
+}
+
+// The newest build with an image for this board.
+function latestBuildFor(boardKey) {
+  const release = state.manifest && state.manifest.releases.find((r) => r.boards[boardKey]);
+  return release ? release.build : null;
+}
+
+// Show a build that has an image for this board: the newest one, unless the
+// build already showing has one.
+function selectReleaseFor(boardKey) {
+  if (!state.manifest || !boardKey) return;
+  if (state.release && state.release.boards[boardKey]) return;
+  const i = state.manifest.releases.findIndex((release) => release.boards[boardKey]);
+  if (i < 0) return;
+  state.release = state.manifest.releases[i];
+  $("release-select").value = String(i);
 }
 
 // ---------------------------------------------------------------- step 1: device
@@ -169,10 +227,16 @@ async function connectAndDetect() {
     const loader = await openLoader();
     state.chip = await readChip(loader);
     const detected = boardForChip(state.chip);
+    selectReleaseFor(detected);
     // Read the partition table while the port is open anyway, so the flash
-    // dialog can offer Update only to a board already laid out for this build.
+    // dialog can offer Update only to a board already laid out for this build,
+    // and on such a board find which build it is running.
     const table = tableFor(detected);
     if (table) state.chip.tableMd5 = await loader.flashMd5sum(parseInt(table.offset, 16), table.size);
+    if (table && state.chip.tableMd5 === table.md5) {
+      state.chip.runningBuild = await runningBuild(loader, detected);
+      log(`Running build: ${state.chip.runningBuild || "not a published one"}`);
+    }
     // Detection only needs the bootloader for a moment. Flashing reconnects,
     // which resets it back into the bootloader.
     await releaseBoard();
@@ -182,7 +246,7 @@ async function connectAndDetect() {
       state.pickedManually = false;
     } else if (!state.pickedManually) {
       state.boardKey = null;
-      showDeviceError(`Not a shift light board (${chipText(state.chip)}). Nothing flashed. If you're sure what it is, use "I know what this is".`);
+      showDeviceError(`Not a board this page knows (${chipText(state.chip)}). Nothing flashed. If you're sure what it is, use "I know what this is".`);
     }
   } catch (err) {
     if (err && err.name === "NotFoundError") {
@@ -227,6 +291,7 @@ function openDevicePicker() {
     card.addEventListener("click", () => {
       state.boardKey = key;
       state.pickedManually = true;
+      selectReleaseFor(key);
       $("device-error").hidden = true;
       $("device-dialog").close();
       render();
@@ -256,11 +321,14 @@ async function loadReleases() {
   releases.forEach((release, i) => {
     const option = document.createElement("option");
     option.value = String(i);
-    option.textContent = `Build ${release.build}${i === 0 ? " (latest)" : ""} · ${release.date}${release.bench ? " · bench" : ""}`;
+    // Which boards each build is for, since a build need not carry both.
+    const boards = Object.keys(release.boards).filter((key) => BOARDS[key]).map((key) => BOARDS[key].short);
+    option.textContent = `Build ${release.build}${i === 0 ? " (latest)" : ""} · ${boards.join(" + ")} · ${release.date}${release.bench ? " · bench" : ""}`;
     select.appendChild(option);
   });
   select.disabled = releases.length === 0;
   state.release = releases[0] || null;
+  selectReleaseFor(state.boardKey);
   select.addEventListener("change", () => {
     state.release = state.manifest.releases[Number(select.value)];
     render();
@@ -296,8 +364,8 @@ function openFlashDialog() {
   updateInput.disabled = needsFresh;
   $("choice-update").classList.toggle("choice-off", needsFresh);
   $("update-desc").textContent = needsFresh
-    ? "Not available: this board doesn't have the shift light firmware's layout on it yet (a new board, or other firmware). Use Fresh install."
-    : "Writes the new firmware only. Thresholds, colours and brightness you saved stay as they are.";
+    ? "Not available: this board doesn't have this firmware's layout on it yet (a new board, or other firmware). Use Fresh install."
+    : `Writes the new firmware only. ${board.keepsText}`;
   $("flash-choices").querySelector(`input[value=${needsFresh ? "fresh" : "update"}]`).checked = true;
   syncStartButton();
   $("btn-start").disabled = false;
@@ -363,7 +431,7 @@ async function startFlash(nextBoard = false) {
     state.chip = await readChip(loader);
     if (nextBoard && !state.pickedManually) {
       state.boardKey = boardForChip(state.chip);
-      if (!state.boardKey) throw new Refusal(`Not a shift light board (${chipText(state.chip)}).`);
+      if (!state.boardKey) throw new Refusal(`Not a board this page knows (${chipText(state.chip)}).`);
     }
     const boardKey = state.boardKey;
     const board = BOARDS[boardKey];
@@ -434,8 +502,8 @@ async function startFlash(nextBoard = false) {
     setStage("Done", 1);
     showResult(true, mode === "fresh"
       ? `Build ${release.build} installed and verified on the ${escapeHtml(board.name.toLowerCase())}, <code>${escapeHtml(mac)}</code>.
-         It's restarting on the default settings. Set it up in the app and press Save.`
-      : `Build ${release.build} written and verified on <code>${escapeHtml(mac)}</code>. Its saved settings are kept.`);
+         ${escapeHtml(board.freshText)} Away from the car ${escapeHtml(board.ledText)}.`
+      : `Build ${release.build} written and verified on <code>${escapeHtml(mac)}</code>. Its saved settings are kept. Away from the car ${escapeHtml(board.ledText)}.`);
     $("btn-start").hidden = true;
     $("btn-next").hidden = false;
     $("btn-next").textContent = `Flash the next board (${state.flashedMacs.length} done)`;
@@ -491,7 +559,7 @@ function checkChipAgainstPick(boardKey) {
   if (!state.pickedManually && detected !== boardKey) {
     throw new Refusal(detected
       ? `The board on this port is the ${BOARDS[detected].name.toLowerCase()} (${BOARDS[detected].module}), not the ${board.name.toLowerCase()} picked earlier. Press Connect again.`
-      : `The board on this port isn't a shift light board (${chipText(state.chip)}).`);
+      : `The board on this port isn't one this page knows (${chipText(state.chip)}).`);
   }
 }
 
@@ -504,7 +572,7 @@ async function checkPartitionTable(loader, table) {
   log(`Partition table md5: flash ${onFlash}, build ${table.md5}`);
   if (state.chip) state.chip.tableMd5 = onFlash;
   if (onFlash !== table.md5) {
-    throw new Refusal("This board doesn't have the shift light firmware's partition layout, so an update could leave it unbootable. Use Fresh install instead.");
+    throw new Refusal("This board doesn't have this firmware's partition layout, so an update could leave it unbootable. Use Fresh install instead.");
   }
 }
 
@@ -550,21 +618,37 @@ function render() {
   $("chip-line").hidden = !state.chip;
   if (state.chip) $("chip-line").textContent = `${chipText(state.chip)} · ${state.chip.mac}`;
   const layout = layoutOnBoard();
+  const running = state.chip && state.chip.runningBuild;
+  const latest = board ? latestBuildFor(state.boardKey) : null;
   $("layout-line").hidden = !layout;
-  $("layout-line").textContent = layout === "match"
-    ? "Already has the shift light's layout: Update keeps its settings."
-    : "New board or other firmware on it: it needs a fresh install.";
+  $("layout-line").textContent = layout === "other"
+    ? "New board or other firmware on it: it needs a fresh install."
+    : !running
+      ? "Has this firmware's layout, running a build this page doesn't list. Update keeps its settings."
+      : running === latest
+        ? `Running build ${running}, the latest. Nothing to upgrade; Update would reinstall it and keep its settings.`
+        : `Running build ${running}. Build ${latest} is newer, and Update keeps its settings.`;
   $("btn-connect").disabled = state.busy || !("serial" in navigator);
   $("btn-connect").textContent = state.busy && !$("flash-dialog").open ? "Connecting..." : connected ? "Connect again" : "Connect";
 
   $("step-firmware").classList.toggle("ready", !!release);
   $("bench-banner").hidden = !(release && release.bench);
   if (release) {
-    $("release-detail").textContent = release.notes || "";
-    const repo = state.manifest.sourceRepo;
-    const sourceHtml = release.sourceCommit
-      ? `Source: <a href="${repo}/tree/${release.sourceCommit}" target="_blank" rel="noopener">esp32-shift-light-R53-mini@${release.sourceCommit.slice(0, 7)}</a>`
-      : "Bench build, not from a published commit.";
+    // Each board's firmware can come from its own repo. A board entry that
+    // names its own source (builds from 2 on) is taken as it stands, including
+    // a null repo, which is the bridge's private one: it gets its commit and no
+    // link. Builds before that carry only the release-level shift light commit.
+    const plan = board && release.boards[state.boardKey];
+    const perBoard = !!plan && "sourceCommit" in plan;
+    const commit = perBoard ? plan.sourceCommit : release.sourceCommit;
+    const repo = perBoard ? plan.sourceRepo : state.manifest.sourceRepo;
+    $("release-detail").textContent = (release.notes || "") +
+      (plan && plan.firmwareBuild ? ` Bridge firmware ${plan.firmwareBuild}.` : "");
+    const sourceHtml = !commit
+      ? "Bench build, not from a published commit."
+      : repo
+        ? `Source: <a href="${repo}/tree/${commit}" target="_blank" rel="noopener">${escapeHtml(repo.split("/").pop())}@${commit.slice(0, 7)}</a>`
+        : `Source: commit ${commit.slice(0, 7)}, in a private repo.`;
     $("release-source").innerHTML = sourceHtml;
     if (board && !release.boards[state.boardKey]) {
       $("release-detail").textContent += ` Not built for the ${board.name.toLowerCase()}.`;
