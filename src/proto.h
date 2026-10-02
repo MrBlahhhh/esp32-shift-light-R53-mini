@@ -63,6 +63,14 @@ static_assert(sizeof(ConfigBlob) == 32, "ConfigBlob must stay 32 bytes");
 #define SL_FLAG_ENABLED   0x01  // strip off entirely when clear
 #define SL_FLAG_MIRRORED  0x02  // fill in pairs from both ends inward
 #define SL_FLAG_SIMULATE  0x04  // sweep RPM instead of reading CAN; runtime only, never saved
+// SD card logging, on the K-line + CAN bridge only (R53_Mini_Kline_Canbus_Logger_
+// Shiftlight docs/BRIDGE-WRITE-AND-SD.md §4). Saved like the rest. A board with
+// no card slot keeps the bits and ignores them.
+#define SL_FLAG_SD_LOG      0x08  // log to the card
+#define SL_FLAG_SD_FMT_MASK 0x30  // which format, below
+#define SL_SD_FMT_TRACKENCODER 0x00  // TrackEncoder rawtel v2, /R53LOG/<boot>_<n>.rawtel
+#define SL_SD_FMT_RACECAPTURE  0x10  // RaceCapture .log, /R53LOG/rc_<n>.log
+                                     // 0x20, 0x30 reserved
 
 // One render on, one off at the 20 Hz render rate. Faster aliases against the
 // render, and the period is shown rounded to a multiple of 100 ms.
@@ -86,6 +94,11 @@ static_assert(sizeof(TelemetryBlob) == 12, "TelemetryBlob must stay 12 bytes");
 #define SL_TLM_RPM_FRESH  0x02  // an RPM frame arrived inside RPM_STALE_MS
 #define SL_TLM_SIMULATING 0x04  // rpm is synthetic — never log this as real
 #define SL_TLM_UNSAVED    0x08  // live config differs from what is in NVS
+// The bridge's card. A board with no slot never sets SD_PRESENT, and the app
+// shows its logging controls only when it is set.
+#define SL_TLM_SD_PRESENT 0x10  // a card is mounted
+#define SL_TLM_SD_LOGGING 0x20  // a log file is open and being written
+#define SL_TLM_SD_ERROR   0x40  // the last write or mount failed
 
 // --- CAN frames -------------------------------------------------------------
 // Batched, because one notify per frame cannot keep up: a quiet R53 bus is
