@@ -1,8 +1,10 @@
 # Stage a build for the web flasher: build each board's env from its committed
 # source, check the images, copy them into the Pages site and add the build to
 # releases.json. Two boards, two repos: the shift light's carrier board from
-# this one, and the K-line + CAN bridge (rev C, XIAO ESP32-S3) from
-# R53_Mini_Kline_Canbus_Logger_Shiftlight, found at -BridgeRepo.
+# esp32-shift-light-twins, the one firmware every car's board runs since
+# protocol v3 (its env c3-r53 starts a fresh board as the R53; builds 1 and 2
+# came from this repo's own src/), and the K-line + CAN bridge (rev C, XIAO
+# ESP32-S3) from R53_Mini_Kline_Canbus_Logger_Shiftlight, found at -BridgeRepo.
 #
 # What it writes into -Site (the gh-pages worktree, see README.md):
 #
@@ -20,15 +22,21 @@
 #   .\publish-release.ps1 -Bench -Site C:\tmp\flasher        stage a bench test from the working tree
 #   .\publish-release.ps1 -Envs esp32-c3                     only this board
 #   .\publish-release.ps1 -Envs xiao_esp32s3                 only the bridge
+#   .\publish-release.ps1 -Envs esp32-c3 -SkipBuild         use the image VS Code just built
 
 param(
     [string]$Site = "C:\Projects\esp32-shift-light-R53-mini-pages",
     # The S3-Zero prototype was retired on 2026-09-29; build 1 is its last.
     [string[]]$Envs = @("esp32-c3", "xiao_esp32s3"),
     [string]$BridgeRepo = "C:\Projects\R53_Mini_Kline_Canbus_Logger_Shiftlight",
+    [string]$ShiftLightRepo = "C:\Projects\esp32-shift-light-twins",
     [int]$Build = 0,
     [string]$Notes = "",
-    [switch]$Bench
+    [switch]$Bench,
+    # PlatformIO doesn't run from every shell (Git Bash can't fetch its
+    # toolchain), so the image can come from VS Code instead. It has to be
+    # newer than the last commit that changed the firmware, or it isn't that source.
+    [switch]$SkipBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -43,10 +51,12 @@ $SourceRepoUrl = "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini"
 # which is how a board on the car is identified, from CAPS_FIRMWARE_BUILD.
 $Targets = [ordered]@{
     "esp32-c3" = @{
-        Dir = $Repo; ChipId = 5; Prefix = "shiftlight"; RepoUrl = $SourceRepoUrl; Public = $true
+        # Private, so the page shows the commit and no link.
+        Dir = $ShiftLightRepo; PioEnv = "c3-r53"; ChipId = 5; Prefix = "shiftlight"
+        RepoUrl = "https://github.com/MrBlahhhh/esp32-shift-light-twins"; Public = $false
     }
     "xiao_esp32s3" = @{
-        Dir = (Join-Path $BridgeRepo "firmware\esp32_shiftlight_wideband"); ChipId = 9; Prefix = "bridge"
+        Dir = (Join-Path $BridgeRepo "firmware\esp32_shiftlight_wideband"); PioEnv = "xiao_esp32s3"; ChipId = 9; Prefix = "bridge"
         RepoUrl = "https://github.com/MrBlahhhh/R53_Mini_Kline_Canbus_Logger_Shiftlight"; Public = $false
         BuildFile = "src\main.cpp"; BuildPattern = '#define CAPS_FIRMWARE_BUILD\s+(\d+)'
     }
@@ -118,9 +128,20 @@ $sourceCommit = $commits["esp32-c3"]
 $pio = Join-Path $env:USERPROFILE ".platformio\penv\Scripts\platformio.exe"
 if (-not (Test-Path $pio)) { $pio = "pio" }
 foreach ($envName in $Envs) {
+    if ($SkipBuild) {
+        $app = Join-Path $Targets[$envName].Dir ".pio\build\$($Targets[$envName].PioEnv)\firmware.bin"
+        if (-not (Test-Path $app)) { throw "$app is missing; build $($Targets[$envName].PioEnv) in VS Code first" }
+        $built = (Get-Item $app).LastWriteTime
+        $committed = [DateTimeOffset]::FromUnixTimeSeconds([int64]"$((Run-Git $Targets[$envName].Dir log -1 --format=%ct -- src include lib platformio.ini).Out)".Trim()).LocalDateTime
+        if (-not $Bench -and $built -lt $committed) {
+            throw "$app was built at $built, before HEAD was committed at $committed; build it again"
+        }
+        Write-Host "Using $envName as built at $built"
+        continue
+    }
     Write-Host "Building $envName"
     $ErrorActionPreference = "Continue"
-    & $pio run -d $Targets[$envName].Dir -e $envName
+    & $pio run -d $Targets[$envName].Dir -e $Targets[$envName].PioEnv
     $built = $LASTEXITCODE -eq 0
     $ErrorActionPreference = "Stop"
     if (-not $built) { throw "pio run failed for $envName" }
@@ -154,7 +175,7 @@ $boardEntries = [ordered]@{}
 foreach ($envName in $Envs) {
     Write-Host "== $envName"
     $target = $Targets[$envName]
-    $dir = Join-Path $target.Dir ".pio\build\$envName"
+    $dir = Join-Path $target.Dir ".pio\build\$($target.PioEnv)"
     $bootloader = Join-Path $dir "bootloader.bin"
     $table = Join-Path $dir "partitions.bin"
     $app = Join-Path $dir "firmware.bin"
