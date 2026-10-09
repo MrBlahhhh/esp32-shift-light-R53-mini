@@ -3,6 +3,92 @@
     "sourceRepo":  "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini",
     "releases":  [
                      {
+                         "build":  7,
+                         "date":  "2026-10-09",
+                         "bench":  false,
+                         "notes":  "The board finds its car on the bus at power-on. Moved to a different car, it switches to the one it hears and keeps your LEDs, colours and switches. Boards on build 5 or newer can install this from the Shift Light app over Bluetooth. Update keeps your thresholds and colours.",
+                         "sourceCommit":  "61bdb2868e8c1dd4a867530474bc1aa5e282c5ab",
+                         "boards":  {
+                                        "esp32-c3":  {
+                                                         "sourceRepo":  null,
+                                                         "sourceCommit":  "61bdb2868e8c1dd4a867530474bc1aa5e282c5ab",
+                                                         "firmwareBuild":  null,
+                                                         "partitionTable":  {
+                                                                                "offset":  "0x8000",
+                                                                                "size":  3072,
+                                                                                "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b"
+                                                                            },
+                                                         "partitions":  {
+                                                                            "nvs":  "0x9000",
+                                                                            "otadata":  "0xe000",
+                                                                            "app0":  "0x10000",
+                                                                            "app1":  "0x1f0000",
+                                                                            "spiffs":  "0x3d0000",
+                                                                            "coredump":  "0x3f0000"
+                                                                        },
+                                                         "update":  [
+                                                                        {
+                                                                            "what":  "app",
+                                                                            "path":  "firmware/7/esp32-c3/shiftlight-esp32-c3-build7.bin",
+                                                                            "offset":  "0x10000",
+                                                                            "size":  753792,
+                                                                            "md5":  "1562c3be14119c9c37cd2d8fa4247539",
+                                                                            "sha256":  "fb243386b0897bcb2789f4f144329803bbb5d6a732a5e69d86d35ded753bba93"
+                                                                        },
+                                                                        {
+                                                                            "what":  "otadata",
+                                                                            "path":  "firmware/7/esp32-c3/boot_app0.bin",
+                                                                            "offset":  "0xe000",
+                                                                            "size":  8192,
+                                                                            "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                            "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                        }
+                                                                    ],
+                                                         "fresh":  [
+                                                                       {
+                                                                           "what":  "bootloader",
+                                                                           "path":  "firmware/7/esp32-c3/bootloader.bin",
+                                                                           "offset":  "0x0",
+                                                                           "size":  19520,
+                                                                           "md5":  "fa7a3a466caf4951feaa1638abe7c624",
+                                                                           "sha256":  "e6397e68487ada6e81a273c4b24966418ef6cbf389bae7801363c97ddcbdaeb9"
+                                                                       },
+                                                                       {
+                                                                           "what":  "partitions",
+                                                                           "path":  "firmware/7/esp32-c3/partitions.bin",
+                                                                           "offset":  "0x8000",
+                                                                           "size":  3072,
+                                                                           "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b",
+                                                                           "sha256":  "0a8b5720e7b77ff11f1462458c3a509dee79224e5279898f26d6a2e3ae0517b7"
+                                                                       },
+                                                                       {
+                                                                           "what":  "otadata",
+                                                                           "path":  "firmware/7/esp32-c3/boot_app0.bin",
+                                                                           "offset":  "0xe000",
+                                                                           "size":  8192,
+                                                                           "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                           "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                       },
+                                                                       {
+                                                                           "what":  "app",
+                                                                           "path":  "firmware/7/esp32-c3/shiftlight-esp32-c3-build7.bin",
+                                                                           "offset":  "0x10000",
+                                                                           "size":  753792,
+                                                                           "md5":  "1562c3be14119c9c37cd2d8fa4247539",
+                                                                           "sha256":  "fb243386b0897bcb2789f4f144329803bbb5d6a732a5e69d86d35ded753bba93"
+                                                                       }
+                                                                   ],
+                                                         "ota":  {
+                                                                     "path":  "firmware/7/esp32-c3/shiftlight-esp32-c3-build7.bin",
+                                                                     "size":  753792,
+                                                                     "sha256":  "fb243386b0897bcb2789f4f144329803bbb5d6a732a5e69d86d35ded753bba93",
+                                                                     "imageDigest":  "0e715b8920d6bb10588425d623427b88a8a6701bf6e47395978ebce0eb88497a",
+                                                                     "signature":  "MEQCIF2nbV35Delf9/DtW6ssmiLJmfLP//XiktWiG3+zcu65AiBxT02UFZZX5v6Ao/IvwpBhBli3I7L4GpdZyuOXMtEbqw=="
+                                                                 }
+                                                     }
+                                    }
+                     },
+                     {
                          "build":  6,
                          "date":  "2026-10-09",
                          "bench":  false,
