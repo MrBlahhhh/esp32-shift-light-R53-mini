@@ -3,6 +3,92 @@
     "sourceRepo":  "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini",
     "releases":  [
                      {
+                         "build":  5,
+                         "date":  "2026-10-08",
+                         "bench":  false,
+                         "notes":  "Firmware updates over Bluetooth from the Shift Light app (1.6 or newer). This one needs USB; later ones can come from the app. Update keeps your thresholds and colours.",
+                         "sourceCommit":  "6e3033598916084b9af2bdafd83ea1ce196cdf71",
+                         "boards":  {
+                                        "esp32-c3":  {
+                                                         "sourceRepo":  null,
+                                                         "sourceCommit":  "6e3033598916084b9af2bdafd83ea1ce196cdf71",
+                                                         "firmwareBuild":  null,
+                                                         "partitionTable":  {
+                                                                                "offset":  "0x8000",
+                                                                                "size":  3072,
+                                                                                "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b"
+                                                                            },
+                                                         "partitions":  {
+                                                                            "nvs":  "0x9000",
+                                                                            "otadata":  "0xe000",
+                                                                            "app0":  "0x10000",
+                                                                            "app1":  "0x1f0000",
+                                                                            "spiffs":  "0x3d0000",
+                                                                            "coredump":  "0x3f0000"
+                                                                        },
+                                                         "update":  [
+                                                                        {
+                                                                            "what":  "app",
+                                                                            "path":  "firmware/5/esp32-c3/shiftlight-esp32-c3-build5.bin",
+                                                                            "offset":  "0x10000",
+                                                                            "size":  751152,
+                                                                            "md5":  "50e8cd84c1f8638a80471935ccdbbfd1",
+                                                                            "sha256":  "2317d15e76a0af6ae7025f6289b8b52c42bdaeeb5a64ab246d57d9437fd4fb13"
+                                                                        },
+                                                                        {
+                                                                            "what":  "otadata",
+                                                                            "path":  "firmware/5/esp32-c3/boot_app0.bin",
+                                                                            "offset":  "0xe000",
+                                                                            "size":  8192,
+                                                                            "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                            "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                        }
+                                                                    ],
+                                                         "fresh":  [
+                                                                       {
+                                                                           "what":  "bootloader",
+                                                                           "path":  "firmware/5/esp32-c3/bootloader.bin",
+                                                                           "offset":  "0x0",
+                                                                           "size":  19520,
+                                                                           "md5":  "fa7a3a466caf4951feaa1638abe7c624",
+                                                                           "sha256":  "e6397e68487ada6e81a273c4b24966418ef6cbf389bae7801363c97ddcbdaeb9"
+                                                                       },
+                                                                       {
+                                                                           "what":  "partitions",
+                                                                           "path":  "firmware/5/esp32-c3/partitions.bin",
+                                                                           "offset":  "0x8000",
+                                                                           "size":  3072,
+                                                                           "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b",
+                                                                           "sha256":  "0a8b5720e7b77ff11f1462458c3a509dee79224e5279898f26d6a2e3ae0517b7"
+                                                                       },
+                                                                       {
+                                                                           "what":  "otadata",
+                                                                           "path":  "firmware/5/esp32-c3/boot_app0.bin",
+                                                                           "offset":  "0xe000",
+                                                                           "size":  8192,
+                                                                           "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                           "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                       },
+                                                                       {
+                                                                           "what":  "app",
+                                                                           "path":  "firmware/5/esp32-c3/shiftlight-esp32-c3-build5.bin",
+                                                                           "offset":  "0x10000",
+                                                                           "size":  751152,
+                                                                           "md5":  "50e8cd84c1f8638a80471935ccdbbfd1",
+                                                                           "sha256":  "2317d15e76a0af6ae7025f6289b8b52c42bdaeeb5a64ab246d57d9437fd4fb13"
+                                                                       }
+                                                                   ],
+                                                         "ota":  {
+                                                                     "path":  "firmware/5/esp32-c3/shiftlight-esp32-c3-build5.bin",
+                                                                     "size":  751152,
+                                                                     "sha256":  "2317d15e76a0af6ae7025f6289b8b52c42bdaeeb5a64ab246d57d9437fd4fb13",
+                                                                     "imageDigest":  "411a1668b52854c69afeb9aa50935e0cff0bc14b70a5175833fe9e9ac8ca6ce5",
+                                                                     "signature":  "MEYCIQCvLqLig33vnbbUZb+nHhcIitKIs1kwvGbicoCEZw3RugIhAMzRki3ho7SzSbbR0t5PSWu6ihqjpVvys8a+agVrt82w"
+                                                                 }
+                                                     }
+                                    }
+                     },
+                     {
                          "build":  4,
                          "date":  "2026-10-08",
                          "bench":  false,
