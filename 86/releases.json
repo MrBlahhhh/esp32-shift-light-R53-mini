@@ -3,6 +3,84 @@
     "sourceRepo":  null,
     "releases":  [
                      {
+                         "build":  2,
+                         "date":  "2026-10-08",
+                         "bench":  false,
+                         "notes":  "Adds VTP/1, so a data logger can read the car\u0027s CAN off the shift light while the app is connected. Update keeps your thresholds and colours.",
+                         "sourceCommit":  "de82c3da150dc33385f38ed958cc6ed97354b733",
+                         "boards":  {
+                                        "esp32-c3":  {
+                                                         "sourceRepo":  null,
+                                                         "sourceCommit":  "de82c3da150dc33385f38ed958cc6ed97354b733",
+                                                         "partitionTable":  {
+                                                                                "offset":  "0x8000",
+                                                                                "size":  3072,
+                                                                                "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b"
+                                                                            },
+                                                         "partitions":  {
+                                                                            "nvs":  "0x9000",
+                                                                            "otadata":  "0xe000",
+                                                                            "app0":  "0x10000",
+                                                                            "app1":  "0x1f0000",
+                                                                            "spiffs":  "0x3d0000",
+                                                                            "coredump":  "0x3f0000"
+                                                                        },
+                                                         "update":  [
+                                                                        {
+                                                                            "what":  "app",
+                                                                            "path":  "firmware/2/esp32-c3/shiftlight-86-esp32-c3-build2.bin",
+                                                                            "offset":  "0x10000",
+                                                                            "size":  717968,
+                                                                            "md5":  "5dfc17ce4a10dbeba794bd1e57e07be1",
+                                                                            "sha256":  "f3f7a117c15eab968452d9bbf42910312b742ae97a0450f543f679812cfcaddb"
+                                                                        },
+                                                                        {
+                                                                            "what":  "otadata",
+                                                                            "path":  "firmware/2/esp32-c3/boot_app0.bin",
+                                                                            "offset":  "0xe000",
+                                                                            "size":  8192,
+                                                                            "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                            "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                        }
+                                                                    ],
+                                                         "fresh":  [
+                                                                       {
+                                                                           "what":  "bootloader",
+                                                                           "path":  "firmware/2/esp32-c3/bootloader.bin",
+                                                                           "offset":  "0x0",
+                                                                           "size":  19520,
+                                                                           "md5":  "fa7a3a466caf4951feaa1638abe7c624",
+                                                                           "sha256":  "e6397e68487ada6e81a273c4b24966418ef6cbf389bae7801363c97ddcbdaeb9"
+                                                                       },
+                                                                       {
+                                                                           "what":  "partitions",
+                                                                           "path":  "firmware/2/esp32-c3/partitions.bin",
+                                                                           "offset":  "0x8000",
+                                                                           "size":  3072,
+                                                                           "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b",
+                                                                           "sha256":  "0a8b5720e7b77ff11f1462458c3a509dee79224e5279898f26d6a2e3ae0517b7"
+                                                                       },
+                                                                       {
+                                                                           "what":  "otadata",
+                                                                           "path":  "firmware/2/esp32-c3/boot_app0.bin",
+                                                                           "offset":  "0xe000",
+                                                                           "size":  8192,
+                                                                           "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                           "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                       },
+                                                                       {
+                                                                           "what":  "app",
+                                                                           "path":  "firmware/2/esp32-c3/shiftlight-86-esp32-c3-build2.bin",
+                                                                           "offset":  "0x10000",
+                                                                           "size":  717968,
+                                                                           "md5":  "5dfc17ce4a10dbeba794bd1e57e07be1",
+                                                                           "sha256":  "f3f7a117c15eab968452d9bbf42910312b742ae97a0450f543f679812cfcaddb"
+                                                                       }
+                                                                   ]
+                                                     }
+                                    }
+                     },
+                     {
                          "build":  1,
                          "date":  "2026-10-07",
                          "bench":  false,
