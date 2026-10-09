@@ -1,13 +1,16 @@
-// 86 / BRZ flasher, for the shift light's C3 board running the Twins firmware.
-// A copy of the R53 flasher (esp32-shift-light-R53-mini/web-flasher) with one
-// board, served from the same Pages site at /86/. One page per car. Talks to the board over Web
-// Serial with esptool-js, works out which published build it is running from
-// its flash, and writes a build listed in releases.json (made by
-// publish-release.ps1).
+// The flasher for one car's shift light: the C3 board running the Twins
+// firmware. A copy of the R53 flasher (esp32-shift-light-R53-mini/web-flasher)
+// with one board, served from the same Pages site at /<folder>/. One page per
+// car, all rendered from this file, index.html and pages.json by
+// publish-release.ps1, which writes the car's details into car.js. Talks to
+// the board over Web Serial with esptool-js, works out which published build
+// it is running from its flash, and writes a build listed in releases.json.
 
 // Pinned to an exact version: a flasher that changes under us between two
 // visits is the last thing that should happen to a board.
 import { CustomReset, ESPLoader, Transport } from "https://cdn.jsdelivr.net/npm/esptool-js@0.7.0/bundle.js";
+// { short, full, board, otherCars: [{ name, manifestUrl }] } for this page's car.
+import CAR from "./car.js";
 
 const BAUD_FLASH = 921600;
 const BAUD_ROM = 115200;
@@ -22,16 +25,16 @@ const RUN_FIRMWARE_RESET = "D0|R1|W200|R0|W200";
 // Keyed by PlatformIO env, which is also the folder name under firmware/<build>/.
 const BOARDS = {
   "esp32-c3": {
-    name: "86 / BRZ Shift Light C3 board",
+    name: CAR.board,
     short: "C3",
     module: "ESP32-C3 SuperMini",
     chip: "ESP32-C3",
     flashMB: 4,
     spec: "ESP32-C3 · 4 MB flash",
-    blurb: "The 54 × 58 mm shift light board with the C3 SuperMini soldered on, for the 86, BRZ and FR-S. A bare SuperMini takes the same build.",
+    blurb: `The 54 × 58 mm shift light board with the C3 SuperMini soldered on, for the ${CAR.full}. A bare SuperMini takes the same build.`,
     ledText: "the blue LED on the SuperMini blinks once a second",
     keepsText: "Thresholds, colours, brightness and the RPM frame you saved stay as they are.",
-    freshText: "It's restarting on the default settings. Set it up in the Twins Shift Light app and press Save.",
+    freshText: "It's restarting on the default settings. Set it up in the Shift Light app and press Save.",
     art: moduleArt("C3", "#1b3a8a"),
   },
 };
@@ -45,10 +48,9 @@ const RUNNING_CHECK_MAX = 6;
 // car's. Each car's flasher publishes the md5 of every app it ships; a board
 // running one of those gets no Update here. A build that was never published
 // isn't caught. Matched on this page's env key, so another car's page has to
-// publish its C3 images under "esp32-c3" too. Paths are relative to this page.
-const OTHER_CARS = [
-  { name: "R53", manifestUrl: "../releases.json" },
-];
+// publish its C3 images under "esp32-c3" too. Paths are relative to this page;
+// publish-release.ps1 lists only the cars whose page is published.
+const OTHER_CARS = CAR.otherCars;
 
 // The C3 SuperMini only comes as the ESP32-C3FH4. Anything else is some other
 // board and gets refused, unless someone picks by hand.
@@ -390,7 +392,7 @@ function openFlashDialog() {
   updateInput.disabled = needsFresh;
   $("choice-update").classList.toggle("choice-off", needsFresh);
   $("update-desc").textContent = other
-    ? `Not available: this board runs the ${other.name} shift light firmware. For that car, use the ${other.name} flasher. Fresh install turns it into an 86 / BRZ board.`
+    ? `Not available: this board runs the ${other.name} shift light firmware. For that car, use the ${other.name} flasher. Fresh install turns it into ${CAR.article} ${CAR.short} board.`
     : needsFresh
       ? "Not available: this board doesn't have this firmware's layout on it yet (a new board, or other firmware). Use Fresh install."
       : `Writes the new firmware only. ${board.keepsText}`;
@@ -611,7 +613,7 @@ async function checkNotOtherCar(loader, boardKey) {
   const other = await runningOtherCar(loader, boardKey);
   if (state.chip) state.chip.otherCar = other;
   if (other) {
-    throw new Refusal(`This board runs the ${other.name} shift light firmware (${other.name} build ${other.build}). Update won't put the 86 / BRZ firmware over it. For that car, use the ${other.name} flasher; to make it an 86 / BRZ board, use Fresh install.`);
+    throw new Refusal(`This board runs the ${other.name} shift light firmware (${other.name} build ${other.build}). Update won't put the ${CAR.short} firmware over it. For that car, use the ${other.name} flasher; to make it ${CAR.article} ${CAR.short} board, use Fresh install.`);
   }
 }
 
@@ -663,7 +665,7 @@ function render() {
   $("layout-line").textContent = layout === "other"
     ? "New board or other firmware on it: it needs a fresh install."
     : otherCarOnBoard()
-      ? `Running the ${state.chip.otherCar.name} shift light firmware, ${state.chip.otherCar.name} build ${state.chip.otherCar.build}. This page is for the 86 / BRZ / FR-S, so Update is off. Use the ${state.chip.otherCar.name} flasher for it.`
+      ? `Running the ${state.chip.otherCar.name} shift light firmware, ${state.chip.otherCar.name} build ${state.chip.otherCar.build}. This page is for the ${CAR.full}, so Update is off. Use the ${state.chip.otherCar.name} flasher for it.`
       : !running
       ? "Has this firmware's layout, running a build this page doesn't list. Update keeps its settings."
       : running === latest
