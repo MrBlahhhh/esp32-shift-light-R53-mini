@@ -59,7 +59,10 @@ which is already low, so it resets nothing.
    the partition layout, copies the images to `firmware/<build>/<env>/`, adds
    the build to `releases.json` (next number unless `-Build` is given, which
    replaces that build) and copies the page. Default `-Site` is
-   `C:\Projects\esp32-shift-light-R53-mini-pages`.
+   `C:\Projects\esp32-shift-light-R53-mini-pages`. The C3 board's image is
+   also signed for Bluetooth updates from the app, with the release key at
+   `-SigningKey` (default `C:\Projects\keys\shiftlight-ota-signing.pem`);
+   esp32-shift-light-twins' README, "Updating over Bluetooth", has the rest.
 3. Commit and push the site (below).
 
 For a bench test from the working tree, stage anywhere with `-Bench` and serve
@@ -121,7 +124,8 @@ an old build, delete `firmware/<n>/` and its entry in `releases.json`.
           { "what": "partitions", "offset": "0x8000", "...": "..." },
           { "what": "otadata", "offset": "0xe000", "...": "..." },
           { "what": "app", "offset": "0x10000", "...": "..." }
-        ]
+        ],
+        "ota": { "path": "firmware/1/esp32-c3/shiftlight-esp32-c3-build1.bin", "size": 703712, "sha256": "...", "imageDigest": "...", "signature": "<base64 DER>" }
       }
     }
   }]

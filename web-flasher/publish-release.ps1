@@ -36,11 +36,16 @@ param(
     # PlatformIO doesn't run from every shell (Git Bash can't fetch its
     # toolchain), so the image can come from VS Code instead. It has to be
     # newer than the last commit that changed the firmware, or it isn't that source.
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    # The release key for Bluetooth updates (web-flasher/ota-sign.ps1 in
+    # esp32-shift-light-twins). Never in a repository.
+    [string]$SigningKey = "C:\Projects\keys\shiftlight-ota-signing.pem"
 )
 
 $ErrorActionPreference = "Stop"
 $Repo = Split-Path $PSScriptRoot -Parent
+# The signing lives with the firmware, which is the one that checks it.
+. (Join-Path $ShiftLightRepo "web-flasher\ota-sign.ps1")
 $SourceRepoUrl = "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini"
 
 # Each board: the PlatformIO project it builds from, the chip id in its image
@@ -53,7 +58,7 @@ $Targets = [ordered]@{
     "esp32-c3" = @{
         # Private, so the page shows the commit and no link.
         Dir = $ShiftLightRepo; PioEnv = "c3-r53"; ChipId = 5; Prefix = "shiftlight"
-        RepoUrl = "https://github.com/MrBlahhhh/esp32-shift-light-twins"; Public = $false
+        RepoUrl = "https://github.com/MrBlahhhh/esp32-shift-light-twins"; Public = $false; Ota = $true
     }
     "xiao_esp32s3" = @{
         Dir = (Join-Path $BridgeRepo "firmware\esp32_shiftlight_wideband"); PioEnv = "xiao_esp32s3"; ChipId = 9; Prefix = "bridge"
@@ -219,12 +224,11 @@ foreach ($envName in $Envs) {
         }
     }
 
-    # Update writes otadata as well as the app. This firmware has no OTA, but
-    # a board that came with other firmware on the same min_spiffs layout may
-    # have been left booting app1, and writing app0 alone would change nothing
-    # it runs. Otadata goes after the app: if the write stops in between,
-    # otadata still names whatever the board booted before. NVS at 0x9000,
-    # where the saved config lives, is never written.
+    # Update writes otadata as well as the app. A board updated over Bluetooth
+    # boots app1, and writing app0 alone would change nothing it runs.
+    # Otadata goes after the app: if the write stops in between, otadata still
+    # names whatever the board booted before. NVS at 0x9000, where the saved
+    # config lives, is never written.
     $update = @(
         (File-Entry $appName 0x10000 "app"),
         (File-Entry "boot_app0.bin" 0xe000 "otadata")
@@ -237,6 +241,19 @@ foreach ($envName in $Envs) {
         (File-Entry "boot_app0.bin" 0xe000 "otadata"),
         (File-Entry $appName 0x10000 "app")
     )
+
+    # What the phone app sends over Bluetooth: the same app image, with the
+    # release key's signature. A bench build without the key still flashes over
+    # USB; it just can't be installed from the app.
+    $ota = $null
+    if ($target.Ota) {
+        if ($Bench -and -not (Test-Path $SigningKey)) {
+            Write-Host "  no signing key, so no Bluetooth update for this bench build"
+        } else {
+            $ota = Get-OtaEntry (Join-Path $outDir $appName) "firmware/$Build/$envName/$appName" $SigningKey $target.Dir
+            Write-Host "  signed for Bluetooth updates, image $($ota.imageDigest.Substring(0, 12))"
+        }
+    }
 
     $partMap = [ordered]@{}
     foreach ($name in $parts.Keys) { $partMap[$name] = Hex $parts[$name].Offset }
@@ -257,6 +274,7 @@ foreach ($envName in $Envs) {
         partitions = $partMap
         update = $update
         fresh = $fresh
+        ota = $ota
     }
     Write-Host "  app $appSize bytes of $($parts['app0'].Size)"
     Write-Host "  update: $(($update | ForEach-Object { "$($_.offset) $($_.what)" }) -join ', ')"
