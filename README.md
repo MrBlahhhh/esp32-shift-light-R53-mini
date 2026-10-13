@@ -1,5 +1,9 @@
 # R53 shift light — CAN, WS2812B, and a phone to set it up
 
+## Current to-do review — 2026-10-13
+
+This repository is the earlier R53-only firmware/reference and public flasher history. Protocol v3 development is now in esp32-shift-light-twins, which is the shared base for every CAN car. Use its docs/PLAN-v3.md and the unified Shift Light Android app for new functionality. Preserve historical releases and verify the actual flasher image/package before directing a customer to update; a current source commit is not a published OTA artifact.
+
 An ESP32 behind the dash of a first-generation MINI Cooper S. It reads RPM off
 the car's CAN bus, drives an eight-LED strip on the steering column shroud, and serves a BLE
 service an Android app uses to set the thresholds, colours and brightness, and to
