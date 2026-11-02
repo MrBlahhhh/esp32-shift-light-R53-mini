@@ -3,6 +3,163 @@
     "sourceRepo":  "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini",
     "releases":  [
                      {
+                         "build":  8,
+                         "date":  "2026-11-02",
+                         "bench":  false,
+                         "notes":  "Log stream for the R53 Logger: the board sends its CAN frames as one compressed stream, and the K-line + CAN board adds its K-line replies and the wideband at 100 Hz. Update keeps your thresholds and colours.",
+                         "sourceCommit":  "59fb1aca70ae2582e5abf37d17f620490a84cf4a",
+                         "boards":  {
+                                        "esp32-c3":  {
+                                                         "sourceRepo":  null,
+                                                         "sourceCommit":  "59fb1aca70ae2582e5abf37d17f620490a84cf4a",
+                                                         "firmwareBuild":  null,
+                                                         "partitionTable":  {
+                                                                                "offset":  "0x8000",
+                                                                                "size":  3072,
+                                                                                "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b"
+                                                                            },
+                                                         "partitions":  {
+                                                                            "nvs":  "0x9000",
+                                                                            "otadata":  "0xe000",
+                                                                            "app0":  "0x10000",
+                                                                            "app1":  "0x1f0000",
+                                                                            "spiffs":  "0x3d0000",
+                                                                            "coredump":  "0x3f0000"
+                                                                        },
+                                                         "update":  [
+                                                                        {
+                                                                            "what":  "app",
+                                                                            "path":  "firmware/8/esp32-c3/shiftlight-esp32-c3-build8.bin",
+                                                                            "offset":  "0x10000",
+                                                                            "size":  760672,
+                                                                            "md5":  "51fbe8e755881db85eabd1de2629b621",
+                                                                            "sha256":  "1b5d5afab237dc1cba62a979ef30338ca11bf2db9b222b4c538a1ba1916c66b3"
+                                                                        },
+                                                                        {
+                                                                            "what":  "otadata",
+                                                                            "path":  "firmware/8/esp32-c3/boot_app0.bin",
+                                                                            "offset":  "0xe000",
+                                                                            "size":  8192,
+                                                                            "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                            "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                        }
+                                                                    ],
+                                                         "fresh":  [
+                                                                       {
+                                                                           "what":  "bootloader",
+                                                                           "path":  "firmware/8/esp32-c3/bootloader.bin",
+                                                                           "offset":  "0x0",
+                                                                           "size":  19520,
+                                                                           "md5":  "fa7a3a466caf4951feaa1638abe7c624",
+                                                                           "sha256":  "e6397e68487ada6e81a273c4b24966418ef6cbf389bae7801363c97ddcbdaeb9"
+                                                                       },
+                                                                       {
+                                                                           "what":  "partitions",
+                                                                           "path":  "firmware/8/esp32-c3/partitions.bin",
+                                                                           "offset":  "0x8000",
+                                                                           "size":  3072,
+                                                                           "md5":  "2ddc2d5f85b2c5288013adbe45d9cb7b",
+                                                                           "sha256":  "0a8b5720e7b77ff11f1462458c3a509dee79224e5279898f26d6a2e3ae0517b7"
+                                                                       },
+                                                                       {
+                                                                           "what":  "otadata",
+                                                                           "path":  "firmware/8/esp32-c3/boot_app0.bin",
+                                                                           "offset":  "0xe000",
+                                                                           "size":  8192,
+                                                                           "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                           "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                       },
+                                                                       {
+                                                                           "what":  "app",
+                                                                           "path":  "firmware/8/esp32-c3/shiftlight-esp32-c3-build8.bin",
+                                                                           "offset":  "0x10000",
+                                                                           "size":  760672,
+                                                                           "md5":  "51fbe8e755881db85eabd1de2629b621",
+                                                                           "sha256":  "1b5d5afab237dc1cba62a979ef30338ca11bf2db9b222b4c538a1ba1916c66b3"
+                                                                       }
+                                                                   ],
+                                                         "ota":  {
+                                                                     "path":  "firmware/8/esp32-c3/shiftlight-esp32-c3-build8.bin",
+                                                                     "size":  760672,
+                                                                     "sha256":  "1b5d5afab237dc1cba62a979ef30338ca11bf2db9b222b4c538a1ba1916c66b3",
+                                                                     "imageDigest":  "b8d23941f8a1d0190ed0b8c1d871917600d46caf04db435d431325ea8d2f6686",
+                                                                     "signature":  "MEUCIQDgD6MNTz7BWQdnFMf+k76w9oOSZ/DgBO//fgaz8RF5JQIgUmH9XvZzIz3z9zey2Dp9lhQZF5HIEWgfwabiSuHZHz0="
+                                                                 }
+                                                     },
+                                        "xiao_esp32s3":  {
+                                                             "sourceRepo":  null,
+                                                             "sourceCommit":  "93fb55bb29066883ff9c70b0602dd5d42881efef",
+                                                             "firmwareBuild":  371,
+                                                             "partitionTable":  {
+                                                                                    "offset":  "0x8000",
+                                                                                    "size":  3072,
+                                                                                    "md5":  "801ba71678a964614657a6d8fbc6baca"
+                                                                                },
+                                                             "partitions":  {
+                                                                                "nvs":  "0x9000",
+                                                                                "otadata":  "0xe000",
+                                                                                "app0":  "0x10000",
+                                                                                "app1":  "0x340000",
+                                                                                "spiffs":  "0x670000",
+                                                                                "coredump":  "0x7f0000"
+                                                                            },
+                                                             "update":  [
+                                                                            {
+                                                                                "what":  "app",
+                                                                                "path":  "firmware/8/xiao_esp32s3/bridge-xiao_esp32s3-build8.bin",
+                                                                                "offset":  "0x10000",
+                                                                                "size":  843536,
+                                                                                "md5":  "2da9f772354b70bcffb7340939a51259",
+                                                                                "sha256":  "5fc26d8fa468c35f75bad60fdbbacad8e2440a80257e7689cae46b2cd28657d3"
+                                                                            },
+                                                                            {
+                                                                                "what":  "otadata",
+                                                                                "path":  "firmware/8/xiao_esp32s3/boot_app0.bin",
+                                                                                "offset":  "0xe000",
+                                                                                "size":  8192,
+                                                                                "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                                "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                            }
+                                                                        ],
+                                                             "fresh":  [
+                                                                           {
+                                                                               "what":  "bootloader",
+                                                                               "path":  "firmware/8/xiao_esp32s3/bootloader.bin",
+                                                                               "offset":  "0x0",
+                                                                               "size":  19984,
+                                                                               "md5":  "25fa99f15c4941a552b5a83656cbdb53",
+                                                                               "sha256":  "11e0d446204ff66d7fa903f50b3db73d07ac4b504832e2a7435f2d55b6d3d588"
+                                                                           },
+                                                                           {
+                                                                               "what":  "partitions",
+                                                                               "path":  "firmware/8/xiao_esp32s3/partitions.bin",
+                                                                               "offset":  "0x8000",
+                                                                               "size":  3072,
+                                                                               "md5":  "801ba71678a964614657a6d8fbc6baca",
+                                                                               "sha256":  "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c"
+                                                                           },
+                                                                           {
+                                                                               "what":  "otadata",
+                                                                               "path":  "firmware/8/xiao_esp32s3/boot_app0.bin",
+                                                                               "offset":  "0xe000",
+                                                                               "size":  8192,
+                                                                               "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                               "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                           },
+                                                                           {
+                                                                               "what":  "app",
+                                                                               "path":  "firmware/8/xiao_esp32s3/bridge-xiao_esp32s3-build8.bin",
+                                                                               "offset":  "0x10000",
+                                                                               "size":  843536,
+                                                                               "md5":  "2da9f772354b70bcffb7340939a51259",
+                                                                               "sha256":  "5fc26d8fa468c35f75bad60fdbbacad8e2440a80257e7689cae46b2cd28657d3"
+                                                                           }
+                                                                       ],
+                                                             "ota":  null
+                                                         }
+                                    }
+                     },
+                     {
                          "build":  7,
                          "date":  "2026-10-09",
                          "bench":  false,
