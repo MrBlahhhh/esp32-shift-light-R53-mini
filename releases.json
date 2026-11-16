@@ -3,6 +3,86 @@
     "sourceRepo":  "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini",
     "releases":  [
                      {
+                         "build":  10,
+                         "date":  "2026-11-15",
+                         "bench":  false,
+                         "notes":  "K-line + CAN bridge firmware 379. A reversed-strip switch for a shift light mounted end for end (Shift Light app 1.12). The log stream for the R53 Logger now goes out every 10 ms, one packet per 100 Hz row. ECU program write and recovery through the board for the R53 Logger, with retries that finish a download a lost reply left open. Update keeps your thresholds and colours.",
+                         "sourceCommit":  null,
+                         "boards":  {
+                                        "xiao_esp32s3":  {
+                                                             "sourceRepo":  null,
+                                                             "sourceCommit":  "6ea2b49a2f59b9996c1d666f3db0335255ce0f92",
+                                                             "firmwareBuild":  379,
+                                                             "partitionTable":  {
+                                                                                    "offset":  "0x8000",
+                                                                                    "size":  3072,
+                                                                                    "md5":  "801ba71678a964614657a6d8fbc6baca"
+                                                                                },
+                                                             "partitions":  {
+                                                                                "nvs":  "0x9000",
+                                                                                "otadata":  "0xe000",
+                                                                                "app0":  "0x10000",
+                                                                                "app1":  "0x340000",
+                                                                                "spiffs":  "0x670000",
+                                                                                "coredump":  "0x7f0000"
+                                                                            },
+                                                             "update":  [
+                                                                            {
+                                                                                "what":  "app",
+                                                                                "path":  "firmware/10/xiao_esp32s3/bridge-xiao_esp32s3-build10.bin",
+                                                                                "offset":  "0x10000",
+                                                                                "size":  852688,
+                                                                                "md5":  "08351327b5d22a4bcdb988b5d8245a78",
+                                                                                "sha256":  "e787098485e6c5418bdb80124e80dfcb0470a689c56bb3e3f0518e1b214bb82b"
+                                                                            },
+                                                                            {
+                                                                                "what":  "otadata",
+                                                                                "path":  "firmware/10/xiao_esp32s3/boot_app0.bin",
+                                                                                "offset":  "0xe000",
+                                                                                "size":  8192,
+                                                                                "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                                "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                            }
+                                                                        ],
+                                                             "fresh":  [
+                                                                           {
+                                                                               "what":  "bootloader",
+                                                                               "path":  "firmware/10/xiao_esp32s3/bootloader.bin",
+                                                                               "offset":  "0x0",
+                                                                               "size":  19984,
+                                                                               "md5":  "25fa99f15c4941a552b5a83656cbdb53",
+                                                                               "sha256":  "11e0d446204ff66d7fa903f50b3db73d07ac4b504832e2a7435f2d55b6d3d588"
+                                                                           },
+                                                                           {
+                                                                               "what":  "partitions",
+                                                                               "path":  "firmware/10/xiao_esp32s3/partitions.bin",
+                                                                               "offset":  "0x8000",
+                                                                               "size":  3072,
+                                                                               "md5":  "801ba71678a964614657a6d8fbc6baca",
+                                                                               "sha256":  "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c"
+                                                                           },
+                                                                           {
+                                                                               "what":  "otadata",
+                                                                               "path":  "firmware/10/xiao_esp32s3/boot_app0.bin",
+                                                                               "offset":  "0xe000",
+                                                                               "size":  8192,
+                                                                               "md5":  "e6327541e2dc394ca2c3b3280ac0f39f",
+                                                                               "sha256":  "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+                                                                           },
+                                                                           {
+                                                                               "what":  "app",
+                                                                               "path":  "firmware/10/xiao_esp32s3/bridge-xiao_esp32s3-build10.bin",
+                                                                               "offset":  "0x10000",
+                                                                               "size":  852688,
+                                                                               "md5":  "08351327b5d22a4bcdb988b5d8245a78",
+                                                                               "sha256":  "e787098485e6c5418bdb80124e80dfcb0470a689c56bb3e3f0518e1b214bb82b"
+                                                                           }
+                                                                       ],
+                                                             "ota":  null
+                                                         }
+                                    }
+                     },
+                     {
                          "build":  9,
                          "date":  "2026-11-15",
                          "bench":  false,
