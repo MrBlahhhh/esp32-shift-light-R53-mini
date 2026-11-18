@@ -129,7 +129,7 @@ def main():
         dest = out / env
         dest.mkdir(parents=True)
         rel = lambda name: f"firmware/{build}/{env}/{name}"
-        app_name = f"{'screen' if is_screen else 'bridge'}-{env}-build{build}.bin"
+        app_name = f"{env if is_screen else 'bridge-' + env}-build{build}.bin"  # screen-lcd21-build12.bin
         for src, name in [("bootloader.bin", "bootloader.bin"), ("partitions.bin", "partitions.bin"), ("firmware.bin", app_name)]:
             shutil.copyfile(built / src, dest / name)
         check_image(dest / "bootloader.bin", app=False)
