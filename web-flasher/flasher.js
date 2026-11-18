@@ -1,4 +1,5 @@
-// R53 flasher, for the R53 Shift Light's C3 board and its K-line + CAN board.
+// R53 flasher, for the R53 Shift Light's C3 board, its K-line + CAN board (plain or with the dash
+// screen) and the dash screens themselves.
 // Talks to the board over Web Serial with esptool-js, works out which board it
 // is from the chip and which published build it is running from its flash, and
 // writes a build listed in releases.json (made by publish-release.ps1).
@@ -25,6 +26,7 @@ const BOARDS = {
     module: "ESP32-C3 SuperMini",
     chip: "ESP32-C3",
     flashMB: 4,
+    family: "c3",
     spec: "ESP32-C3 · 4 MB flash",
     blurb: "The 54 × 58 mm shift light board with the C3 SuperMini soldered on. A bare SuperMini takes the same build.",
     ledText: "the blue LED on the SuperMini blinks once a second",
@@ -39,6 +41,7 @@ const BOARDS = {
     module: "Seeed XIAO ESP32-S3",
     chip: "ESP32-S3",
     flashMB: 8,
+    family: "bridge",
     spec: "ESP32-S3 · 8 MB flash · 8 MB PSRAM",
     blurb: "Rev C, with the XIAO soldered flat: K-line, CAN, wideband and the shift light on one board.",
     ledText: "the orange LED on the XIAO blinks once a second",
@@ -46,7 +49,60 @@ const BOARDS = {
     freshText: "It's restarting on the defaults. Set up the shift light in the R53 Shift app and the K-line polling from R53 Logger.",
     art: moduleArt("S3", "#2b2f36"),
   },
+  // The same board and chip, built to drive the dash screen on its USB-C (env xiao_esp32s3_lcd,
+  // bridge build 381 on). Connect can't tell the two apart from the chip; it goes by the
+  // firmware already on it, and "This board drives a dash screen" switches between them.
+  "xiao_esp32s3_lcd": {
+    name: "R53 Shift Light K-line + CAN board, with dash screen",
+    short: "K-line + CAN + screen",
+    module: "Seeed XIAO ESP32-S3",
+    chip: "ESP32-S3",
+    flashMB: 8,
+    family: "bridge",
+    variantOf: "xiao_esp32s3",
+    spec: "ESP32-S3 · 8 MB flash · 8 MB PSRAM",
+    blurb: "The same rev C board, built to drive a Waveshare dash screen on the XIAO's USB-C. Its serial console moves to D4 and D5.",
+    ledText: "the orange LED on the XIAO blinks once a second",
+    keepsText: "The K-line polling set and the shift light settings you saved stay as they are.",
+    freshText: "It's restarting on the defaults. Set up the shift light in the R53 Shift app and the K-line polling from R53 Logger.",
+    afterText: "From now on its USB-C belongs to the screen: to flash it again, hold BOOT on the XIAO while you plug it into the computer.",
+    art: moduleArt("S3", "#2b2f36"),
+  },
+  // The dash screens (screen firmware, R53_Mini_Kline_Canbus_Logger_Shiftlight screen/). All four
+  // are an ESP32-S3R8 with 16 MB flash, so Connect asks which one, unless one of these builds is
+  // already on it.
+  "screen-lcd21": screenBoard("Waveshare 2.1in round LCD", "ESP32-S3-Touch-LCD-2.1", "round",
+    "480 round IPS with touch, the methanol controller's screen. Either USB-C flashes it."),
+  "screen-lcd28c": screenBoard("Waveshare 2.8in round LCD", "ESP32-S3-Touch-LCD-2.8C", "round",
+    "480 round IPS with touch. Either USB-C flashes it."),
+  "screen-amoled175": screenBoard("Waveshare 1.75in round AMOLED", "ESP32-S3-Touch-AMOLED-1.75", "round",
+    "466 round AMOLED, 700 nits. Fits a 52 mm gauge pod."),
+  "screen-amoled241": screenBoard("Waveshare 2.41in AMOLED", "ESP32-S3-Touch-AMOLED-2.41 (V2)", "rect",
+    "600 x 450 AMOLED, 800 nits, the current V2 board. Stays dark after flashing? It's a V1: flash that one."),
+  "screen-amoled241v1": screenBoard("Waveshare 2.41in AMOLED, V1 board", "ESP32-S3-Touch-AMOLED-2.41 (V1)", "rect",
+    "The first revision of the 2.41, wired differently. Only if the V2 build leaves the screen dark."),
 };
+
+function screenBoard(title, module, shape, blurb) {
+  return {
+    name: `Dash screen, ${title}`,
+    short: title.replace("Waveshare ", "").replace(", V1 board", " V1"),
+    module: `Waveshare ${module}`,
+    chip: "ESP32-S3",
+    flashMB: 16,
+    family: "screen",
+    spec: "ESP32-S3 · 16 MB flash · 8 MB PSRAM",
+    blurb,
+    ledText: "the screen lights up and says No bridge",
+    keepsText: "Its brightness, boost units, graph set and the page it was on stay as they are.",
+    freshText: "It starts on the Gauges page and says No bridge until it's plugged into the K-line + CAN board's screen build.",
+    art: screenArt(shape),
+  };
+}
+
+const SCREEN_KEYS = Object.keys(BOARDS).filter((key) => BOARDS[key].family === "screen");
+// The firmware a board key is a build of, so a variant counts as its chip's board.
+const baseOf = (key) => (key && BOARDS[key] && BOARDS[key].variantOf) || key;
 
 // How many published builds Connect checks the board's app against. Each is one
 // md5 of the app region, well under a second with the stub.
@@ -59,6 +115,35 @@ const RUNNING_CHECK_MAX = 6;
 function boardForChip(chip) {
   if (chip.name === "ESP32-C3" && chip.flashMB === 4) return "esp32-c3";
   if (chip.name === "ESP32-S3" && chip.flashMB === 8 && chip.psramMB === 8) return "xiao_esp32s3";
+  return null;
+}
+
+// The four dash screens: an ESP32-S3R8 with 16 MB flash. Which of them it is, the chip can't say.
+function isScreenChip(chip) {
+  return chip.name === "ESP32-S3" && chip.flashMB === 16 && chip.psramMB === 8;
+}
+
+// Of these board keys, the one whose published app is on the flash: its partition table first,
+// then each build's app md5 (runningBuild).
+async function identifyByRunning(loader, keys) {
+  const tables = {};
+  for (const key of keys) {
+    const release = state.manifest && state.manifest.releases.find((r) => r.boards[key]);
+    const table = release && release.boards[key].partitionTable;
+    if (!table) continue;
+    const at = `${table.offset}:${table.size}`;
+    if (!(at in tables)) tables[at] = await loader.flashMd5sum(parseInt(table.offset, 16), table.size);
+    // Kept for a screen picked by hand afterwards: all five share one layout.
+    state.chip.tableMd5 = tables[at];
+    if (tables[at] !== table.md5) continue;
+    const build = await runningBuild(loader, key);
+    if (build) {
+      state.chip.runningBuild = build;
+      state.chip.knownByFirmware = true;
+      log(`Recognised the ${BOARDS[key].name.toLowerCase()} by its firmware, build ${build}`);
+      return key;
+    }
+  }
   return null;
 }
 
@@ -177,6 +262,7 @@ async function readChip(loader) {
     mac: await loader.chip.readMac(loader),
     tableMd5: null,
     runningBuild: null,  // the published build whose app is on the flash, if any
+    knownByFirmware: false,  // board told apart from its chip by that build (screen build, screens)
   };
 }
 
@@ -226,15 +312,23 @@ async function connectAndDetect() {
     state.portInfo = null;
     const loader = await openLoader();
     state.chip = await readChip(loader);
-    const detected = boardForChip(state.chip);
+    let detected = boardForChip(state.chip);
+    let pickScreen = false;
+    if (detected === "xiao_esp32s3") {
+      // Running the screen build? Then that's the build it gets offered.
+      detected = (await identifyByRunning(loader, ["xiao_esp32s3_lcd"])) || detected;
+    } else if (!detected && isScreenChip(state.chip)) {
+      detected = await identifyByRunning(loader, SCREEN_KEYS);
+      pickScreen = !detected;
+    }
     selectReleaseFor(detected);
     // Read the partition table while the port is open anyway, so the flash
     // dialog can offer Update only to a board already laid out for this build,
     // and on such a board find which build it is running.
     const table = tableFor(detected);
-    if (table) state.chip.tableMd5 = await loader.flashMd5sum(parseInt(table.offset, 16), table.size);
+    if (table && !state.chip.knownByFirmware) state.chip.tableMd5 = await loader.flashMd5sum(parseInt(table.offset, 16), table.size);
     if (table && state.chip.tableMd5 === table.md5) {
-      state.chip.runningBuild = await runningBuild(loader, detected);
+      if (!state.chip.knownByFirmware) state.chip.runningBuild = await runningBuild(loader, detected);
       log(`Running build: ${state.chip.runningBuild || "not a published one"}`);
     }
     // Detection only needs the bootloader for a moment. Flashing reconnects,
@@ -244,6 +338,10 @@ async function connectAndDetect() {
     if (detected) {
       state.boardKey = detected;
       state.pickedManually = false;
+    } else if (pickScreen) {
+      state.boardKey = null;
+      showDeviceError("A 16 MB ESP32-S3 with no dash screen firmware on it yet. Pick which screen it is.");
+      openDevicePicker("screen");
     } else if (!state.pickedManually) {
       state.boardKey = null;
       showDeviceError(`Not a board this page knows (${chipText(state.chip)}). Nothing flashed. If you're sure what it is, use "I know what this is".`);
@@ -276,10 +374,15 @@ function chipText(chip) {
   return `${chip.name}, ${chip.flashMB || "?"} MB flash, ${chip.psramMB ? chip.psramMB + " MB" : "no"} PSRAM`;
 }
 
-function openDevicePicker() {
+function openDevicePicker(family) {
   const grid = $("device-grid");
   grid.textContent = "";
+  $("device-dialog-title").textContent = family === "screen" ? "Which screen is it?" : "Pick the board";
+  $("device-dialog-note").textContent = family === "screen"
+    ? "The four screens have the same chip, so the page can't tell them apart until one of these builds is on it. It's the name printed on the back of the board. The page still checks the chip and its flash before writing anything."
+    : "Only do this if the automatic check got it wrong or couldn't run. The page still checks the chip and its flash before writing anything.";
   for (const [key, board] of Object.entries(BOARDS)) {
+    if (typeof family === "string" && board.family !== family) continue;
     const card = document.createElement("button");
     card.type = "button";
     card.className = "device-card";
@@ -322,7 +425,8 @@ async function loadReleases() {
     const option = document.createElement("option");
     option.value = String(i);
     // Which boards each build is for, since a build need not carry both.
-    const boards = Object.keys(release.boards).filter((key) => BOARDS[key]).map((key) => BOARDS[key].short);
+    const boards = [...new Set(Object.keys(release.boards).filter((key) => BOARDS[key])
+      .map((key) => BOARDS[key].family === "screen" ? "dash screens" : BOARDS[baseOf(key)].short))];
     option.textContent = `Build ${release.build}${i === 0 ? " (latest)" : ""} · ${boards.join(" + ")} · ${release.date}${release.bench ? " · bench" : ""}`;
     select.appendChild(option);
   });
@@ -418,6 +522,8 @@ async function startFlash(nextBoard = false) {
   $("btn-next").hidden = true;
   $("flash-choices").querySelectorAll("input").forEach((input) => { input.disabled = true; });
   $("result").hidden = true;
+  // A batch keeps the variant or screen of the board before it.
+  const previousKey = state.boardKey;
   if (nextBoard) {
     state.portInfo = null;
     state.chip = null;
@@ -430,7 +536,10 @@ async function startFlash(nextBoard = false) {
     const loader = await openLoader();
     state.chip = await readChip(loader);
     if (nextBoard && !state.pickedManually) {
-      state.boardKey = boardForChip(state.chip);
+      const chipBoard = boardForChip(state.chip);
+      if (chipBoard && baseOf(previousKey) === chipBoard) state.boardKey = previousKey;
+      else if (!chipBoard && isScreenChip(state.chip) && BOARDS[previousKey] && BOARDS[previousKey].family === "screen") state.boardKey = previousKey;
+      else state.boardKey = chipBoard;
       if (!state.boardKey) throw new Refusal(`Not a board this page knows (${chipText(state.chip)}).`);
     }
     const boardKey = state.boardKey;
@@ -500,10 +609,11 @@ async function startFlash(nextBoard = false) {
     if (!state.flashedMacs.includes(mac)) state.flashedMacs.push(mac);
     log(`Flashed ${mac}, build ${release.build}, ${mode}. Boards flashed on this page: ${state.flashedMacs.length}`);
     setStage("Done", 1);
-    showResult(true, mode === "fresh"
+    showResult(true, (mode === "fresh"
       ? `Build ${release.build} installed and verified on the ${escapeHtml(board.name.toLowerCase())}, <code>${escapeHtml(mac)}</code>.
          ${escapeHtml(board.freshText)} Away from the car ${escapeHtml(board.ledText)}.`
-      : `Build ${release.build} written and verified on <code>${escapeHtml(mac)}</code>. Its saved settings are kept. Away from the car ${escapeHtml(board.ledText)}.`);
+      : `Build ${release.build} written and verified on <code>${escapeHtml(mac)}</code>. Its saved settings are kept. Away from the car ${escapeHtml(board.ledText)}.`)
+      + (board.afterText ? ` <strong>${escapeHtml(board.afterText)}</strong>` : ""));
     $("btn-start").hidden = true;
     $("btn-next").hidden = false;
     $("btn-next").textContent = `Flash the next board (${state.flashedMacs.length} done)`;
@@ -556,7 +666,8 @@ function checkChipAgainstPick(boardKey) {
   if (state.chip.flashMB < board.flashMB) {
     throw new Refusal(`This chip has ${state.chip.flashMB} MB of flash and the ${board.name} image needs ${board.flashMB} MB.`);
   }
-  if (!state.pickedManually && detected !== boardKey) {
+  const screenOk = !detected && isScreenChip(state.chip) && board.family === "screen";
+  if (!state.pickedManually && baseOf(boardKey) !== detected && !screenOk) {
     throw new Refusal(detected
       ? `The board on this port is the ${BOARDS[detected].name.toLowerCase()} (${BOARDS[detected].module}), not the ${board.name.toLowerCase()} picked earlier. Press Connect again.`
       : `The board on this port isn't one this page knows (${chipText(state.chip)}).`);
@@ -610,11 +721,16 @@ function render() {
   if (board) {
     $("device-picked-art").innerHTML = board.art;
     $("device-picked-name").textContent = `${board.name} · ${board.module}`;
-    $("device-picked-how").textContent = state.pickedManually ? "Picked by hand" : "Detected from the chip";
+    $("device-picked-how").textContent = state.pickedManually ? "Picked by hand"
+      : state.chip && state.chip.knownByFirmware ? "Detected from the chip and the firmware on it" : "Detected from the chip";
     $("device-hint").hidden = true;
   } else {
     $("device-hint").hidden = false;
   }
+  // The K-line + CAN board takes the plain build or the dash screen build.
+  const isBridge = !!board && board.family === "bridge";
+  $("variant-row").hidden = !isBridge;
+  if (isBridge) $("variant-screen").checked = state.boardKey === "xiao_esp32s3_lcd";
   $("chip-line").hidden = !state.chip;
   if (state.chip) $("chip-line").textContent = `${chipText(state.chip)} · ${state.chip.mac}`;
   const layout = layoutOnBoard();
@@ -643,7 +759,8 @@ function render() {
     const commit = perBoard ? plan.sourceCommit : release.sourceCommit;
     const repo = perBoard ? plan.sourceRepo : state.manifest.sourceRepo;
     $("release-detail").textContent = (release.notes || "") +
-      (plan && plan.firmwareBuild ? ` K-line + CAN firmware ${plan.firmwareBuild}.` : "");
+      (plan && plan.firmwareBuild ? ` K-line + CAN firmware ${plan.firmwareBuild}.` : "") +
+      (plan && plan.screenVersion ? ` Screen firmware ${plan.screenVersion}.` : "");
     const sourceHtml = !commit
       ? "Bench build, not from a published commit."
       : repo
@@ -692,12 +809,30 @@ function moduleArt(label, pcb) {
   </svg>`;
 }
 
+// A plain drawing of a dash screen: a round or a rectangular face with a gauge arc and a number.
+function screenArt(shape) {
+  const face = shape === "round"
+    ? `<circle cx="60" cy="55" r="44" fill="#0b0f14" stroke="#4b5563" stroke-width="3"/>
+       <path d="M 30 78 A 38 38 0 1 1 90 78" fill="none" stroke="#FFB000" stroke-width="6" stroke-linecap="round"/>`
+    : `<rect x="28" y="10" width="64" height="90" rx="8" fill="#0b0f14" stroke="#4b5563" stroke-width="3"/>
+       <rect x="36" y="20" width="36" height="6" rx="3" fill="#FFB000"/>`;
+  return `<svg viewBox="0 0 120 110" role="img" aria-label="${shape} dash screen">
+    ${face}
+    <text x="60" y="${shape === "round" ? 62 : 58}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="18" font-weight="500" fill="#F2F2F2">5940</text>
+  </svg>`;
+}
+
 // ---------------------------------------------------------------- wire up
 
 function init() {
   if (!("serial" in navigator)) $("no-serial").hidden = false;
   $("btn-connect").addEventListener("click", connectAndDetect);
-  $("btn-manual").addEventListener("click", openDevicePicker);
+  $("btn-manual").addEventListener("click", () => openDevicePicker());
+  $("variant-screen").addEventListener("change", (event) => {
+    state.boardKey = event.target.checked ? "xiao_esp32s3_lcd" : "xiao_esp32s3";
+    selectReleaseFor(state.boardKey);
+    render();
+  });
   $("btn-flash").addEventListener("click", openFlashDialog);
   $("btn-start").addEventListener("click", () => startFlash(false));
   $("btn-next").addEventListener("click", () => startFlash(true));

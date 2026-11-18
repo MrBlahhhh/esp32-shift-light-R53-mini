@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>R53 shift light flasher</title>
-  <meta name="description" content="Put the R53 shift light firmware on the R53 Shift Light C3 board (ESP32-C3 SuperMini) or the K-line + CAN board (XIAO ESP32-S3) from the browser.">
+  <meta name="description" content="Put the R53 shift light firmware on the R53 Shift Light C3 board (ESP32-C3 SuperMini), the K-line + CAN board (XIAO ESP32-S3) or its Waveshare dash screen from the browser.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800&family=Schibsted+Grotesk:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -33,7 +33,7 @@
       </svg>
       <div>
         <h1>R53 flasher</h1>
-        <p class="subtitle">Firmware for the R53 Shift Light C3 board and K-line + CAN board, straight from the browser.</p>
+        <p class="subtitle">Firmware for the R53 Shift Light C3 board, the K-line + CAN board and its dash screen, straight from the browser.</p>
       </div>
     </header>
 
@@ -49,6 +49,10 @@
               <div class="how" id="device-picked-how"></div>
             </div>
           </div>
+          <label class="variant" id="variant-row" hidden>
+            <input type="checkbox" id="variant-screen">
+            <span>This board drives a dash screen <span class="note">(the screen build: the XIAO's USB-C goes to the screen)</span></span>
+          </label>
           <p class="chip-line" id="chip-line" hidden></p>
           <p class="note" id="layout-line" hidden></p>
           <p class="note note-bad" id="device-error" hidden></p>
@@ -87,6 +91,8 @@
         <h3>Which board</h3>
         <p><strong>R53 Shift Light C3 board.</strong> The shift light as it ships: a 54 &times; 58 mm board with an ESP32-C3 SuperMini soldered in the middle, USB-C at the top. Plug the cable into the SuperMini. A bare SuperMini on the bench takes the same build.</p>
         <p><strong>R53 Shift Light K-line + CAN board.</strong> Rev C, with a Seeed XIAO ESP32-S3 soldered flat, USB-C over the top edge. Plug the cable into the XIAO, with the 12 V disconnected: power it from USB or 12 V, never both.</p>
+        <p><strong>With a dash screen.</strong> The same board takes a second build, which drives a Waveshare touchscreen plugged into the XIAO's USB-C. Tick <strong>This board drives a dash screen</strong> after Connect to flash it. In that build the USB-C belongs to the screen, so to flash the board again, hold <strong>BOOT</strong> on the XIAO while you plug it into the computer.</p>
+        <p><strong>Dash screens.</strong> The Waveshare ESP32-S3 2.1in and 2.8in round LCDs, the 1.75in round AMOLED and the 2.41in AMOLED. Flash the screen on its own, unplugged from the bridge. They all have the same chip, so the first time the page asks which one it is; after that it knows from the firmware. Not sure whether a 2.41 is the V1 or V2 board: flash the V2 build, and if the screen stays dark, the V1.</p>
         <p>The page reads the chip, picks the build itself, and tells you which build the board is already running. Flash it on the bench, disconnected from the car.</p>
       </div>
 
@@ -96,6 +102,7 @@
           <li>The board restarts on its own. Away from the car, the status LED blinks once a second: blue on the C3 board's SuperMini, orange on the K-line + CAN board's XIAO. That's "no CAN", which is what it should say on the bench.</li>
           <li>Open the app and connect: the <a href="https://mrblahhhh.github.io/car/tech/2026/07/11/r53-esp32-shift-light.html#getting-the-app" target="_blank" rel="noopener">Android app</a>, or <a href="https://logs.geekopolis.com/shiftlight/" target="_blank" rel="noopener">logs.geekopolis.com/shiftlight</a> in Chrome (Bluefy on an iPhone). There's no pairing and no PIN.</li>
           <li>After a fresh install it runs the default thresholds and colours. Set yours and press <strong>Save</strong>. An update keeps what was saved.</li>
+          <li>A dash screen lights up and says <strong>No bridge</strong> until it's plugged into a K-line + CAN board running the screen build. One USB-C cable between them: the board powers the screen.</li>
         </ol>
       </div>
 
@@ -105,14 +112,15 @@
           <li>Use a USB <strong>data</strong> cable. A lot of USB-C cables are charge-only and the board never shows up.</li>
           <li>Close anything else holding the port: a serial monitor, PlatformIO, the Arduino IDE, another flasher tab.</li>
           <li>Force the bootloader: hold <strong>BOOT</strong>, tap <strong>RST</strong>, let go of BOOT, then press Connect again. Plugging the cable in while holding BOOT does the same. On the C3 board both buttons are on the SuperMini, next to the USB-C; on the XIAO they are the two tiny ones marked B and R.</li>
-          <li>No driver needed. Both boards use the chip's own USB. In the port list it's usually "USB JTAG/serial debug unit" or "USB Serial Device".</li>
+          <li>A K-line + CAN board on the screen build never shows up on its own: its USB-C is the screen's. Hold <strong>BOOT</strong> on the XIAO while you plug it in, then Connect.</li>
+          <li>No driver needed. Every board uses the chip's own USB. In the port list it's usually "USB JTAG/serial debug unit" or "USB Serial Device". The 2.1 and 2.8 screens also have a second USB-C through a CH343 chip; if one port won't connect, try the other.</li>
           <li>Chrome and Edge on a computer can do this. Firefox and Safari can't, and neither can a phone.</li>
         </ul>
       </div>
 
       <div class="card">
         <h3>Source</h3>
-        <p>The firmware is on GitHub: <a href="https://github.com/MrBlahhhh/esp32-shift-light-R53-mini" target="_blank" rel="noopener">github.com/MrBlahhhh/esp32-shift-light-R53-mini</a>. Each build links the commit it was built from.</p>
+        <p>The shift light firmware is on GitHub: <a href="https://github.com/MrBlahhhh/esp32-shift-light-R53-mini" target="_blank" rel="noopener">github.com/MrBlahhhh/esp32-shift-light-R53-mini</a>. Each build links the commit it was built from. The K-line + CAN board and dash screen firmware is in a private repo; each build names its commit.</p>
         <p>The shift light itself, the housing and the assembled version: <a href="https://ryansdesigns.geekopolis.com/shiftlight/" target="_blank" rel="noopener">ryansdesigns.geekopolis.com/shiftlight</a>.</p>
       </div>
     </section>
@@ -129,7 +137,7 @@
       <button class="modal-close" type="button" data-close aria-label="Close">&times;</button>
     </div>
     <div class="modal-body">
-      <p class="note">Only do this if the automatic check got it wrong or couldn't run. The page still checks the chip and its flash before writing anything.</p>
+      <p class="note" id="device-dialog-note">Only do this if the automatic check got it wrong or couldn't run. The page still checks the chip and its flash before writing anything.</p>
       <div class="device-grid" id="device-grid"></div>
     </div>
   </dialog>

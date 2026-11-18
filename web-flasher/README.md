@@ -13,10 +13,22 @@ the product page's colours.
 | Chip | Flash | PSRAM | Env |
 |---|---|---|---|
 | ESP32-C3 | 4 MB | none | `esp32-c3` (carrier board, C3 SuperMini) |
+| ESP32-S3 | 8 MB | 8 MB | `xiao_esp32s3` (K-line + CAN board, XIAO ESP32-S3), or `xiao_esp32s3_lcd` if it's running that |
+| ESP32-S3 | 16 MB | 8 MB | a dash screen: `screen-lcd21`, `screen-lcd28c`, `screen-amoled175`, `screen-amoled241`, `screen-amoled241v1` |
 
-Anything else gets "not a shift light board, nothing flashed". "I know what
-this is" picks by hand; the chip family and flash size are still checked
-before writing. While the port is open it also reads the md5 of the partition
+The chip can't tell the K-line + CAN board's two builds apart, or the five
+screens from each other. Connect checks the app on the flash against each
+published build of those envs and takes the one that matches. Otherwise the
+XIAO gets the plain build, with a "This board drives a dash screen" box to
+switch to the screen build, and a screen opens the picker filtered to the
+screens. Anything else gets "not a board this page knows, nothing flashed".
+"I know what this is" picks by hand; the chip family and flash size are still
+checked before writing.
+
+The screen build (`xiao_esp32s3_lcd`) turns the XIAO's USB-C into a USB host
+for the screen, so it never shows up as a port on its own: hold BOOT while
+plugging it in and the ROM's USB comes up instead. The page says so after
+flashing it. While the port is open it also reads the md5 of the partition
 table at `0x8000`, so a board that isn't on this build's layout (a new board,
 or other firmware) gets Fresh install preselected and Update greyed out.
 
@@ -27,6 +39,11 @@ different layout.
 
 **Fresh install** erases the chip and writes bootloader `0x0`, partition table
 `0x8000`, otadata `0xe000` and app `0x10000`. The board boots on defaults.
+
+**The screens** have one factory app at `0x10000` and NVS from `0x9000` to
+`0xf000`, over where otadata would be. Their Update is the app alone and
+their Fresh install is bootloader, partition table and app: never
+`boot_app0.bin`, which would land in their NVS.
 
 Every file is checked against the manifest's sha256 after download and before
 anything is written, and against its md5 on the flash after writing.
@@ -65,6 +82,22 @@ which is already low, so it resets nothing.
    esp32-shift-light-twins' README, "Updating over Bluetooth", has the rest.
 3. Commit and push the site (below).
 
+**The K-line + CAN board and the screens** build from the R53 bridge repo,
+which is private, so publish-release.ps1 doesn't make them. On Linux, with
+that repo checked out and committed:
+
+```sh
+python3 web-flasher/publish-r53.py --repo ~/work/R53_Mini_Kline_Canbus_Logger_Shiftlight \
+    --site ../esp32-shift-light-R53-mini-pages --notes "What changed, one line"
+```
+
+It builds `xiao_esp32s3`, `xiao_esp32s3_lcd` and the five screen envs, checks
+each is an ESP32-S3 image, reads each partition table for its layout, and adds
+one build carrying all seven with their commit (`--no-screens` for the bridge
+alone). Each board's `sourceRepo` is null, so the page names the commit with
+no link. Bridge entries carry `firmwareBuild` (`CAPS_FIRMWARE_BUILD` in
+`main.cpp`), screen entries `screenVersion` (the app's version, `PROJECT_VER`).
+
 For a bench test from the working tree, stage anywhere with `-Bench` and serve
 it locally. Web Serial works on localhost without HTTPS. A bench build shows a
 red banner and no source link.
@@ -96,8 +129,9 @@ git push -u origin gh-pages
 Then on GitHub: Settings, Pages, "Deploy from a branch", `gh-pages`, `/ (root)`.
 The page is at https://mrblahhhh.github.io/esp32-shift-light-R53-mini/.
 
-Each build adds about 1.5 MB (two boards, about 0.7 MB of app each). To drop
-an old build, delete `firmware/<n>/` and its entry in `releases.json`.
+A C3 build adds about 0.7 MB. An R53 build with the screens adds about 6 MB
+(seven envs, 0.8 to 0.9 MB of app each). To drop an old build, delete
+`firmware/<n>/` and its entry in `releases.json`.
 
 ## releases.json
 
