@@ -45,6 +45,13 @@ different layout.
 their Fresh install is bootloader, partition table and app: never
 `boot_app0.bin`, which would land in their NVS.
 
+From screen 0.1.1 (R53 build 12) the table has a `bootclip` partition at
+`0x710000`, and both Update and Fresh install also write `bootclip.bin` there,
+as `pio run -t upload` does: the boot video behind its 16-byte `R5CLIP01`
+header on the 2.1 and 2.8C (2.7 MB), 16 bytes of `0xFF` ("no clip") on the
+AMOLEDs. A screen still on 0.1.0's table fails the Update check and is sent
+to Fresh install, which loses its saved settings once.
+
 Every file is checked against the manifest's sha256 after download and before
 anything is written, and against its md5 on the flash after writing.
 
@@ -129,8 +136,9 @@ git push -u origin gh-pages
 Then on GitHub: Settings, Pages, "Deploy from a branch", `gh-pages`, `/ (root)`.
 The page is at https://mrblahhhh.github.io/esp32-shift-light-R53-mini/.
 
-A C3 build adds about 0.7 MB. An R53 build with the screens adds about 6 MB
-(seven envs, 0.8 to 0.9 MB of app each). To drop an old build, delete
+A C3 build adds about 0.7 MB. An R53 build with the screens adds about 12 MB
+(seven envs, 0.8 to 0.9 MB of app each, and a 2.7 MB boot video each for the
+2.1 and 2.8C). To drop an old build, delete
 `firmware/<n>/` and its entry in `releases.json`.
 
 ## releases.json

@@ -36,9 +36,16 @@ SCREEN_ENVS = ["screen-lcd21", "screen-lcd28c", "screen-amoled175", "screen-amol
 # Source that goes into an image; anything uncommitted here and the build's commit would lie.
 SOURCE_PATHS = [f"{BRIDGE_DIR}/src", f"{BRIDGE_DIR}/include", f"{BRIDGE_DIR}/lib", f"{BRIDGE_DIR}/platformio.ini",
                 f"{SCREEN_DIR}/src", f"{SCREEN_DIR}/platformio.ini", f"{SCREEN_DIR}/CMakeLists.txt",
-                f"{SCREEN_DIR}/partitions.csv", f"{SCREEN_DIR}/sdkconfig.defaults", "shared"]
+                f"{SCREEN_DIR}/partitions.csv", f"{SCREEN_DIR}/sdkconfig.defaults",
+                f"{SCREEN_DIR}/sdkconfig.lcd.defaults", f"{SCREEN_DIR}/sdkconfig.amoled.defaults",
+                f"{SCREEN_DIR}/bootclip.py", f"{SCREEN_DIR}/boot", "shared"]
 ESP32S3_CHIP_ID = 9
 APP_DESC_MAGIC = 0xABCD5432
+# The screen's boot clip partition (screen 0.1.1 on). bootclip.py writes bootclip.bin into the
+# build: "R5CLIP01", the clip's length and the lettering frames, then the MJPEG; a board with no
+# clip gets 16 bytes of 0xFF, which the player reads as "no clip" and which clears an old one.
+CLIP_MAGIC = b"R5CLIP01"
+CLIP_EMPTY = b"\xff" * 16
 
 
 def fail(text):
@@ -161,9 +168,27 @@ def main():
             entry["screenVersion"] = version
             entry["update"] = [app]
             entry["fresh"] = [bootloader, partitions, app]
+            if "bootclip" in table:
+                # What `pio run -t upload` writes as well (bootclip.py), on Update too, so a new
+                # clip reaches a screen that keeps its settings.
+                clip_offset, clip_size, _ = table["bootclip"]
+                shutil.copyfile(built / "bootclip.bin", dest / "bootclip.bin")
+                clip = (dest / "bootclip.bin").read_bytes()
+                if clip != CLIP_EMPTY:
+                    if clip[:8] != CLIP_MAGIC or struct.unpack_from("<I", clip, 8)[0] != len(clip) - 16:
+                        fail(f"{env}: bootclip.bin has no R5CLIP01 header or its length is wrong")
+                    if clip[16:18] != b"\xff\xd8":
+                        fail(f"{env}: the boot clip doesn't start with a JPEG frame")
+                if len(clip) > clip_size:
+                    fail(f"{env}: the boot clip is {len(clip)} bytes, its partition {clip_size}")
+                bootclip = describe(dest / "bootclip.bin", "bootclip", clip_offset, rel("bootclip.bin"))
+                entry["bootClip"] = clip != CLIP_EMPTY
+                entry["update"].append(bootclip)
+                entry["fresh"].append(bootclip)
         entry["ota"] = None
         boards[env] = entry
-        print(f"{env}: {app['size']} bytes, {'screen ' + version if is_screen else f'build {firmware_build}'}")
+        clip_note = f", boot clip {entry['update'][-1]['size']} bytes" if entry.get("bootClip") else ""
+        print(f"{env}: {app['size']} bytes, {'screen ' + version if is_screen else f'build {firmware_build}'}{clip_note}")
 
     releases.append({"build": build, "date": args.date, "bench": False, "notes": args.notes,
                      "sourceCommit": None, "boards": boards})
