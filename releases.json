@@ -3,6 +3,507 @@
   "sourceRepo": "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini",
   "releases": [
     {
+      "build": 12,
+      "date": "2026-11-20",
+      "bench": false,
+      "notes": "K-line + CAN bridge firmware 383 and dash screen 0.1.1. The screens now play a boot video with the car's name (2.1 and 2.8C; pick the name on the Display page), and the brightness slider no longer snaps back to 5 %. A screen on 0.1.0 needs a Fresh install once, for the boot video's space. The bridge takes firmware updates over Bluetooth from R53 Logger, and in the screen build passes the screen's updates through from the phone. Update keeps your settings.",
+      "sourceCommit": null,
+      "boards": {
+        "xiao_esp32s3": {
+          "sourceRepo": null,
+          "sourceCommit": "936103ba74e894431c292b94eb75e734d54085ed",
+          "partitionTable": {
+            "offset": "0x8000",
+            "size": 3072,
+            "md5": "801ba71678a964614657a6d8fbc6baca"
+          },
+          "partitions": {
+            "nvs": "0x9000",
+            "otadata": "0xe000",
+            "app0": "0x10000",
+            "app1": "0x340000",
+            "spiffs": "0x670000",
+            "coredump": "0x7f0000"
+          },
+          "firmwareBuild": 383,
+          "update": [
+            {
+              "what": "app",
+              "path": "firmware/12/xiao_esp32s3/bridge-xiao_esp32s3-build12.bin",
+              "offset": "0x10000",
+              "size": 887952,
+              "md5": "16f0d7bd05739c28a1cf4a8bf9ded96b",
+              "sha256": "c87bdacbe1c2ea72c239392589a75059f90322b275be140caad20555347c4ac3"
+            },
+            {
+              "what": "otadata",
+              "path": "firmware/12/xiao_esp32s3/boot_app0.bin",
+              "offset": "0xe000",
+              "size": 8192,
+              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
+              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+            }
+          ],
+          "fresh": [
+            {
+              "what": "bootloader",
+              "path": "firmware/12/xiao_esp32s3/bootloader.bin",
+              "offset": "0x0",
+              "size": 19984,
+              "md5": "25fa99f15c4941a552b5a83656cbdb53",
+              "sha256": "11e0d446204ff66d7fa903f50b3db73d07ac4b504832e2a7435f2d55b6d3d588"
+            },
+            {
+              "what": "partitions",
+              "path": "firmware/12/xiao_esp32s3/partitions.bin",
+              "offset": "0x8000",
+              "size": 3072,
+              "md5": "801ba71678a964614657a6d8fbc6baca",
+              "sha256": "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c"
+            },
+            {
+              "what": "otadata",
+              "path": "firmware/12/xiao_esp32s3/boot_app0.bin",
+              "offset": "0xe000",
+              "size": 8192,
+              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
+              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+            },
+            {
+              "what": "app",
+              "path": "firmware/12/xiao_esp32s3/bridge-xiao_esp32s3-build12.bin",
+              "offset": "0x10000",
+              "size": 887952,
+              "md5": "16f0d7bd05739c28a1cf4a8bf9ded96b",
+              "sha256": "c87bdacbe1c2ea72c239392589a75059f90322b275be140caad20555347c4ac3"
+            }
+          ],
+          "ota": null
+        },
+        "xiao_esp32s3_lcd": {
+          "sourceRepo": null,
+          "sourceCommit": "936103ba74e894431c292b94eb75e734d54085ed",
+          "partitionTable": {
+            "offset": "0x8000",
+            "size": 3072,
+            "md5": "801ba71678a964614657a6d8fbc6baca"
+          },
+          "partitions": {
+            "nvs": "0x9000",
+            "otadata": "0xe000",
+            "app0": "0x10000",
+            "app1": "0x340000",
+            "spiffs": "0x670000",
+            "coredump": "0x7f0000"
+          },
+          "firmwareBuild": 383,
+          "update": [
+            {
+              "what": "app",
+              "path": "firmware/12/xiao_esp32s3_lcd/bridge-xiao_esp32s3_lcd-build12.bin",
+              "offset": "0x10000",
+              "size": 961072,
+              "md5": "bc15779269bba90bb3bc6418b251c31a",
+              "sha256": "1865205be6d3930341d9738bea70b229438ffe52abb3ae2955183a3747ba1da1"
+            },
+            {
+              "what": "otadata",
+              "path": "firmware/12/xiao_esp32s3_lcd/boot_app0.bin",
+              "offset": "0xe000",
+              "size": 8192,
+              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
+              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+            }
+          ],
+          "fresh": [
+            {
+              "what": "bootloader",
+              "path": "firmware/12/xiao_esp32s3_lcd/bootloader.bin",
+              "offset": "0x0",
+              "size": 19984,
+              "md5": "25fa99f15c4941a552b5a83656cbdb53",
+              "sha256": "11e0d446204ff66d7fa903f50b3db73d07ac4b504832e2a7435f2d55b6d3d588"
+            },
+            {
+              "what": "partitions",
+              "path": "firmware/12/xiao_esp32s3_lcd/partitions.bin",
+              "offset": "0x8000",
+              "size": 3072,
+              "md5": "801ba71678a964614657a6d8fbc6baca",
+              "sha256": "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c"
+            },
+            {
+              "what": "otadata",
+              "path": "firmware/12/xiao_esp32s3_lcd/boot_app0.bin",
+              "offset": "0xe000",
+              "size": 8192,
+              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
+              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+            },
+            {
+              "what": "app",
+              "path": "firmware/12/xiao_esp32s3_lcd/bridge-xiao_esp32s3_lcd-build12.bin",
+              "offset": "0x10000",
+              "size": 961072,
+              "md5": "bc15779269bba90bb3bc6418b251c31a",
+              "sha256": "1865205be6d3930341d9738bea70b229438ffe52abb3ae2955183a3747ba1da1"
+            }
+          ],
+          "ota": null
+        },
+        "screen-lcd21": {
+          "sourceRepo": null,
+          "sourceCommit": "936103ba74e894431c292b94eb75e734d54085ed",
+          "partitionTable": {
+            "offset": "0x8000",
+            "size": 3072,
+            "md5": "e35927aef5a41f0c06034a1a8ca04462"
+          },
+          "partitions": {
+            "nvs": "0x9000",
+            "phy_init": "0xf000",
+            "factory": "0x10000",
+            "bootclip": "0x710000"
+          },
+          "screenVersion": "0.1.1",
+          "update": [
+            {
+              "what": "app",
+              "path": "firmware/12/screen-lcd21/screen-lcd21-build12.bin",
+              "offset": "0x10000",
+              "size": 1148480,
+              "md5": "fe14edb34d5c7e09259137b1afa3772d",
+              "sha256": "eb436adcfed89af19008bf180972fb1c92352060ea705acf33646944bcbdb39c"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/12/screen-lcd21/bootclip.bin",
+              "offset": "0x710000",
+              "size": 2762997,
+              "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
+              "sha256": "f916c27462d8270157e981a305606bcb9626c84480b978ec474eefed3e5af176"
+            }
+          ],
+          "fresh": [
+            {
+              "what": "bootloader",
+              "path": "firmware/12/screen-lcd21/bootloader.bin",
+              "offset": "0x0",
+              "size": 22288,
+              "md5": "de959fe14d24a5cec35ca3d6143f032e",
+              "sha256": "359f5cce2635b3c2db2584e58b6f647ebbf87eefc3c7a64520597ed89d325e74"
+            },
+            {
+              "what": "partitions",
+              "path": "firmware/12/screen-lcd21/partitions.bin",
+              "offset": "0x8000",
+              "size": 3072,
+              "md5": "e35927aef5a41f0c06034a1a8ca04462",
+              "sha256": "5b23642c6ede45c3602c23409918b3cda937e683ace36f20b3f182cc29c203a9"
+            },
+            {
+              "what": "app",
+              "path": "firmware/12/screen-lcd21/screen-lcd21-build12.bin",
+              "offset": "0x10000",
+              "size": 1148480,
+              "md5": "fe14edb34d5c7e09259137b1afa3772d",
+              "sha256": "eb436adcfed89af19008bf180972fb1c92352060ea705acf33646944bcbdb39c"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/12/screen-lcd21/bootclip.bin",
+              "offset": "0x710000",
+              "size": 2762997,
+              "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
+              "sha256": "f916c27462d8270157e981a305606bcb9626c84480b978ec474eefed3e5af176"
+            }
+          ],
+          "bootClip": true,
+          "ota": null
+        },
+        "screen-lcd28c": {
+          "sourceRepo": null,
+          "sourceCommit": "936103ba74e894431c292b94eb75e734d54085ed",
+          "partitionTable": {
+            "offset": "0x8000",
+            "size": 3072,
+            "md5": "e35927aef5a41f0c06034a1a8ca04462"
+          },
+          "partitions": {
+            "nvs": "0x9000",
+            "phy_init": "0xf000",
+            "factory": "0x10000",
+            "bootclip": "0x710000"
+          },
+          "screenVersion": "0.1.1",
+          "update": [
+            {
+              "what": "app",
+              "path": "firmware/12/screen-lcd28c/screen-lcd28c-build12.bin",
+              "offset": "0x10000",
+              "size": 1149664,
+              "md5": "cf8e58a4ecdc40b58b930ed13cefd8ef",
+              "sha256": "5e86396386984e1713f4998bd97ba1f447101caa1bd2b1350add499ba0e51d0e"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/12/screen-lcd28c/bootclip.bin",
+              "offset": "0x710000",
+              "size": 2762997,
+              "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
+              "sha256": "f916c27462d8270157e981a305606bcb9626c84480b978ec474eefed3e5af176"
+            }
+          ],
+          "fresh": [
+            {
+              "what": "bootloader",
+              "path": "firmware/12/screen-lcd28c/bootloader.bin",
+              "offset": "0x0",
+              "size": 22288,
+              "md5": "a415450a222951c5661919b547e1c68d",
+              "sha256": "e00d3df6af0a00daf2c73a9184c2220a27b0f157b51370f7f03f85d3bf45ae9b"
+            },
+            {
+              "what": "partitions",
+              "path": "firmware/12/screen-lcd28c/partitions.bin",
+              "offset": "0x8000",
+              "size": 3072,
+              "md5": "e35927aef5a41f0c06034a1a8ca04462",
+              "sha256": "5b23642c6ede45c3602c23409918b3cda937e683ace36f20b3f182cc29c203a9"
+            },
+            {
+              "what": "app",
+              "path": "firmware/12/screen-lcd28c/screen-lcd28c-build12.bin",
+              "offset": "0x10000",
+              "size": 1149664,
+              "md5": "cf8e58a4ecdc40b58b930ed13cefd8ef",
+              "sha256": "5e86396386984e1713f4998bd97ba1f447101caa1bd2b1350add499ba0e51d0e"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/12/screen-lcd28c/bootclip.bin",
+              "offset": "0x710000",
+              "size": 2762997,
+              "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
+              "sha256": "f916c27462d8270157e981a305606bcb9626c84480b978ec474eefed3e5af176"
+            }
+          ],
+          "bootClip": true,
+          "ota": null
+        },
+        "screen-amoled175": {
+          "sourceRepo": null,
+          "sourceCommit": "936103ba74e894431c292b94eb75e734d54085ed",
+          "partitionTable": {
+            "offset": "0x8000",
+            "size": 3072,
+            "md5": "e35927aef5a41f0c06034a1a8ca04462"
+          },
+          "partitions": {
+            "nvs": "0x9000",
+            "phy_init": "0xf000",
+            "factory": "0x10000",
+            "bootclip": "0x710000"
+          },
+          "screenVersion": "0.1.1",
+          "update": [
+            {
+              "what": "app",
+              "path": "firmware/12/screen-amoled175/screen-amoled175-build12.bin",
+              "offset": "0x10000",
+              "size": 1147440,
+              "md5": "7accf41327b01fe6dc68b776d8fd9fbe",
+              "sha256": "7cea3a855d6c9ec28815a0cdacf6fc6ee657210d405903cf20288a368b5a5a09"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/12/screen-amoled175/bootclip.bin",
+              "offset": "0x710000",
+              "size": 16,
+              "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
+              "sha256": "5ac6a5945f16500911219129984ba8b387a06f24fe383ce4e81a73294065461b"
+            }
+          ],
+          "fresh": [
+            {
+              "what": "bootloader",
+              "path": "firmware/12/screen-amoled175/bootloader.bin",
+              "offset": "0x0",
+              "size": 22272,
+              "md5": "f8ea8afa9057bddced33282d32278cde",
+              "sha256": "01cb4d48f9596811dcb18490598f2c6116802ea916523feec9bb56e96b72ef36"
+            },
+            {
+              "what": "partitions",
+              "path": "firmware/12/screen-amoled175/partitions.bin",
+              "offset": "0x8000",
+              "size": 3072,
+              "md5": "e35927aef5a41f0c06034a1a8ca04462",
+              "sha256": "5b23642c6ede45c3602c23409918b3cda937e683ace36f20b3f182cc29c203a9"
+            },
+            {
+              "what": "app",
+              "path": "firmware/12/screen-amoled175/screen-amoled175-build12.bin",
+              "offset": "0x10000",
+              "size": 1147440,
+              "md5": "7accf41327b01fe6dc68b776d8fd9fbe",
+              "sha256": "7cea3a855d6c9ec28815a0cdacf6fc6ee657210d405903cf20288a368b5a5a09"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/12/screen-amoled175/bootclip.bin",
+              "offset": "0x710000",
+              "size": 16,
+              "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
+              "sha256": "5ac6a5945f16500911219129984ba8b387a06f24fe383ce4e81a73294065461b"
+            }
+          ],
+          "bootClip": false,
+          "ota": null
+        },
+        "screen-amoled241": {
+          "sourceRepo": null,
+          "sourceCommit": "936103ba74e894431c292b94eb75e734d54085ed",
+          "partitionTable": {
+            "offset": "0x8000",
+            "size": 3072,
+            "md5": "e35927aef5a41f0c06034a1a8ca04462"
+          },
+          "partitions": {
+            "nvs": "0x9000",
+            "phy_init": "0xf000",
+            "factory": "0x10000",
+            "bootclip": "0x710000"
+          },
+          "screenVersion": "0.1.1",
+          "update": [
+            {
+              "what": "app",
+              "path": "firmware/12/screen-amoled241/screen-amoled241-build12.bin",
+              "offset": "0x10000",
+              "size": 1137616,
+              "md5": "19cc644985e3e19121e5aa331031fcec",
+              "sha256": "74eedc7603f0d2524ee10d49cdc68c9ba4bc2cf54f70875c5d250ceba360bca3"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/12/screen-amoled241/bootclip.bin",
+              "offset": "0x710000",
+              "size": 16,
+              "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
+              "sha256": "5ac6a5945f16500911219129984ba8b387a06f24fe383ce4e81a73294065461b"
+            }
+          ],
+          "fresh": [
+            {
+              "what": "bootloader",
+              "path": "firmware/12/screen-amoled241/bootloader.bin",
+              "offset": "0x0",
+              "size": 22272,
+              "md5": "813f679d75d28d430ad9ebade8e7375a",
+              "sha256": "3cc73642e698fdfccfb6b1ba5dcdc3ae7078dacb49160772b9e5f08f3e34c069"
+            },
+            {
+              "what": "partitions",
+              "path": "firmware/12/screen-amoled241/partitions.bin",
+              "offset": "0x8000",
+              "size": 3072,
+              "md5": "e35927aef5a41f0c06034a1a8ca04462",
+              "sha256": "5b23642c6ede45c3602c23409918b3cda937e683ace36f20b3f182cc29c203a9"
+            },
+            {
+              "what": "app",
+              "path": "firmware/12/screen-amoled241/screen-amoled241-build12.bin",
+              "offset": "0x10000",
+              "size": 1137616,
+              "md5": "19cc644985e3e19121e5aa331031fcec",
+              "sha256": "74eedc7603f0d2524ee10d49cdc68c9ba4bc2cf54f70875c5d250ceba360bca3"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/12/screen-amoled241/bootclip.bin",
+              "offset": "0x710000",
+              "size": 16,
+              "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
+              "sha256": "5ac6a5945f16500911219129984ba8b387a06f24fe383ce4e81a73294065461b"
+            }
+          ],
+          "bootClip": false,
+          "ota": null
+        },
+        "screen-amoled241v1": {
+          "sourceRepo": null,
+          "sourceCommit": "936103ba74e894431c292b94eb75e734d54085ed",
+          "partitionTable": {
+            "offset": "0x8000",
+            "size": 3072,
+            "md5": "e35927aef5a41f0c06034a1a8ca04462"
+          },
+          "partitions": {
+            "nvs": "0x9000",
+            "phy_init": "0xf000",
+            "factory": "0x10000",
+            "bootclip": "0x710000"
+          },
+          "screenVersion": "0.1.1",
+          "update": [
+            {
+              "what": "app",
+              "path": "firmware/12/screen-amoled241v1/screen-amoled241v1-build12.bin",
+              "offset": "0x10000",
+              "size": 1137088,
+              "md5": "43997a39e3f55ddbbcc950aab10889d2",
+              "sha256": "832603b282e36cd78ce715470a0ec66524416c6053bd7c8468c18e656c2a0bce"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/12/screen-amoled241v1/bootclip.bin",
+              "offset": "0x710000",
+              "size": 16,
+              "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
+              "sha256": "5ac6a5945f16500911219129984ba8b387a06f24fe383ce4e81a73294065461b"
+            }
+          ],
+          "fresh": [
+            {
+              "what": "bootloader",
+              "path": "firmware/12/screen-amoled241v1/bootloader.bin",
+              "offset": "0x0",
+              "size": 22272,
+              "md5": "423de22dc571bf9d429159f82f8bc715",
+              "sha256": "46b4bae386b3c0bbc10e47ee8251713fab5dd4a56465c2c5700a06f72b6d0a34"
+            },
+            {
+              "what": "partitions",
+              "path": "firmware/12/screen-amoled241v1/partitions.bin",
+              "offset": "0x8000",
+              "size": 3072,
+              "md5": "e35927aef5a41f0c06034a1a8ca04462",
+              "sha256": "5b23642c6ede45c3602c23409918b3cda937e683ace36f20b3f182cc29c203a9"
+            },
+            {
+              "what": "app",
+              "path": "firmware/12/screen-amoled241v1/screen-amoled241v1-build12.bin",
+              "offset": "0x10000",
+              "size": 1137088,
+              "md5": "43997a39e3f55ddbbcc950aab10889d2",
+              "sha256": "832603b282e36cd78ce715470a0ec66524416c6053bd7c8468c18e656c2a0bce"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/12/screen-amoled241v1/bootclip.bin",
+              "offset": "0x710000",
+              "size": 16,
+              "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
+              "sha256": "5ac6a5945f16500911219129984ba8b387a06f24fe383ce4e81a73294065461b"
+            }
+          ],
+          "bootClip": false,
+          "ota": null
+        }
+      }
+    },
+    {
       "build": 11,
       "date": "2026-11-17",
       "bench": false,

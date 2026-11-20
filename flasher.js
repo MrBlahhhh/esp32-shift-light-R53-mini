@@ -95,7 +95,7 @@ function screenBoard(title, module, shape, blurb) {
     blurb,
     ledText: "the screen lights up and says No bridge",
     keepsText: "Its brightness, boost units, graph set and the page it was on stay as they are.",
-    freshText: "It starts on the Gauges page and says No bridge until it's plugged into the K-line + CAN board's screen build.",
+    freshText: "It plays its boot animation, then starts on the Gauges page and says No bridge until it's plugged into the K-line + CAN board's screen build.",
     art: screenArt(shape),
   };
 }
@@ -704,7 +704,7 @@ async function download(file) {
 }
 
 function shortName(file) {
-  return { app: "firmware", otadata: "boot selector", bootloader: "bootloader", partitions: "partition table" }[file.what] || file.what;
+  return { app: "firmware", otadata: "boot selector", bootloader: "bootloader", partitions: "partition table", bootclip: "boot video" }[file.what] || file.what;
 }
 
 // ---------------------------------------------------------------- render
