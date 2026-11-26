@@ -125,7 +125,7 @@ const RUNNING_CHECK_MAX = 6;
 // The C3 SuperMini only comes as the ESP32-C3FH4, and the XIAO ESP32-S3 is an
 // ESP32-S3R8: 8 MB flash, 8 MB PSRAM. Anything else is some other board and
 // gets refused, unless someone picks by hand. The S3-Zero prototype (4 MB, 2 MB
-// PSRAM) was retired on 2026-09-29; build 1 in releases.json still carries it.
+// PSRAM) was retired on 2026-09-29, and its build 1 left the site with the other old builds.
 function boardForChip(chip) {
   if (chip.name === "ESP32-C3" && chip.flashMB === 4) return "esp32-c3";
   if (chip.name === "ESP32-S3" && chip.flashMB === 8 && chip.psramMB === 8) return "xiao_esp32s3";

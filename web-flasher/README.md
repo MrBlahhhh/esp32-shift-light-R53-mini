@@ -105,6 +105,15 @@ alone). Each board's `sourceRepo` is null, so the page names the commit with
 no link. Bridge entries carry `firmwareBuild` (`CAPS_FIRMWARE_BUILD` in
 `main.cpp`), screen entries `screenVersion` (the app's version, `PROJECT_VER`).
 
+**Only each board's newest build stays on the page.** `prune_releases.py` drops what a newer
+build has replaced: a release keeps the boards it's the newest for, loses the rest, and goes with
+its images when none are left (git keeps them in the site's history). `publish-r53.py` runs it
+after adding a build; after `publish-release.ps1`, run it by hand:
+
+```sh
+python3 web-flasher/prune_releases.py --site ../esp32-shift-light-R53-mini-pages
+```
+
 For a bench test from the working tree, stage anywhere with `-Bench` and serve
 it locally. Web Serial works on localhost without HTTPS. A bench build shows a
 red banner and no source link.

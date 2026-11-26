@@ -210,6 +210,11 @@ def main():
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     for name in PAGE_FILES:
         shutil.copyfile(HERE / name, site / name)
+    # Only each board's newest build stays on the page (prune_releases.py).
+    sys.path.insert(0, str(HERE))
+    from prune_releases import prune
+    for line in prune(site):
+        print(f"pruned {line}")
     print(f"Build {build} from {commit[:7]} in {site}. Commit and push the site.")
 
 
