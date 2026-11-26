@@ -3,15 +3,15 @@
   "sourceRepo": "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini",
   "releases": [
     {
-      "build": 15,
+      "build": 16,
       "date": "2026-11-26",
       "bench": false,
-      "notes": "Dash screens: they log to their own SD card (Display page, Log to SD card: on for the Bluetooth 2.1, off for the wired screens, where the K-line board logs). The Bluetooth 2.1 for the C3 board: a fix for the picture shifting and doubling (builds 13 and 14).",
+      "notes": "Dash screens: dim with the dash lights (Display, Dim with dash lights; the Bluetooth 2.1 reads it from the C3 board, the wired screens from K-line board firmware 387, not on this page yet). Log to their own SD card. The Bluetooth 2.1's picture fix from build 15.",
       "sourceCommit": null,
       "boards": {
         "screen-lcd21": {
           "sourceRepo": null,
-          "sourceCommit": "b79894757581dd178f705e28beaab9fcc9b1546b",
+          "sourceCommit": "576912415391baf8e207a1e8ce94fa11d2c08f98",
           "partitionTable": {
             "offset": "0x8000",
             "size": 3072,
@@ -27,15 +27,15 @@
           "update": [
             {
               "what": "app",
-              "path": "firmware/15/screen-lcd21/screen-lcd21-build15.bin",
+              "path": "firmware/16/screen-lcd21/screen-lcd21-build16.bin",
               "offset": "0x10000",
-              "size": 1240752,
-              "md5": "11c946bd88fbaec5aed2fa9e5731e8b6",
-              "sha256": "85acb92be59c04a07963777e9fb443bc899136448e06c227532f39dbeb42d5b7"
+              "size": 1241328,
+              "md5": "cbbb9118dcfeba4c48b78fa19f7b18d3",
+              "sha256": "cf175ccfd107e4f78683022aea4e873bc720a9c88005fb26b008efb68bca45a3"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-lcd21/bootclip.bin",
+              "path": "firmware/16/screen-lcd21/bootclip.bin",
               "offset": "0x710000",
               "size": 2762997,
               "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
@@ -45,7 +45,7 @@
           "fresh": [
             {
               "what": "bootloader",
-              "path": "firmware/15/screen-lcd21/bootloader.bin",
+              "path": "firmware/16/screen-lcd21/bootloader.bin",
               "offset": "0x0",
               "size": 22288,
               "md5": "3ed3f2874052186c51abc511f21fe79f",
@@ -53,7 +53,7 @@
             },
             {
               "what": "partitions",
-              "path": "firmware/15/screen-lcd21/partitions.bin",
+              "path": "firmware/16/screen-lcd21/partitions.bin",
               "offset": "0x8000",
               "size": 3072,
               "md5": "e35927aef5a41f0c06034a1a8ca04462",
@@ -61,15 +61,15 @@
             },
             {
               "what": "app",
-              "path": "firmware/15/screen-lcd21/screen-lcd21-build15.bin",
+              "path": "firmware/16/screen-lcd21/screen-lcd21-build16.bin",
               "offset": "0x10000",
-              "size": 1240752,
-              "md5": "11c946bd88fbaec5aed2fa9e5731e8b6",
-              "sha256": "85acb92be59c04a07963777e9fb443bc899136448e06c227532f39dbeb42d5b7"
+              "size": 1241328,
+              "md5": "cbbb9118dcfeba4c48b78fa19f7b18d3",
+              "sha256": "cf175ccfd107e4f78683022aea4e873bc720a9c88005fb26b008efb68bca45a3"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-lcd21/bootclip.bin",
+              "path": "firmware/16/screen-lcd21/bootclip.bin",
               "offset": "0x710000",
               "size": 2762997,
               "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
@@ -81,7 +81,7 @@
         },
         "screen-lcd21-ble": {
           "sourceRepo": null,
-          "sourceCommit": "b79894757581dd178f705e28beaab9fcc9b1546b",
+          "sourceCommit": "576912415391baf8e207a1e8ce94fa11d2c08f98",
           "partitionTable": {
             "offset": "0x8000",
             "size": 3072,
@@ -97,15 +97,15 @@
           "update": [
             {
               "what": "app",
-              "path": "firmware/15/screen-lcd21-ble/screen-lcd21-ble-build15.bin",
+              "path": "firmware/16/screen-lcd21-ble/screen-lcd21-ble-build16.bin",
               "offset": "0x10000",
-              "size": 1380160,
-              "md5": "1b64fa8885d4d8eca5e31317eb8329a8",
-              "sha256": "6c9232dd81ef85ce479b4cc8fec8b27576d45991416fdc89959649b6e3f6be7c"
+              "size": 1380896,
+              "md5": "f869c6a451c2698b5df556ba19e5a375",
+              "sha256": "c7dce4d66ba4e0b0053ae688758a3432ef1b81c7ba6abae8a0c0860940f71429"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-lcd21-ble/bootclip.bin",
+              "path": "firmware/16/screen-lcd21-ble/bootclip.bin",
               "offset": "0x710000",
               "size": 2762997,
               "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
@@ -115,7 +115,7 @@
           "fresh": [
             {
               "what": "bootloader",
-              "path": "firmware/15/screen-lcd21-ble/bootloader.bin",
+              "path": "firmware/16/screen-lcd21-ble/bootloader.bin",
               "offset": "0x0",
               "size": 22288,
               "md5": "683ce102e597b408cc1a446ca9d4aadf",
@@ -123,7 +123,7 @@
             },
             {
               "what": "partitions",
-              "path": "firmware/15/screen-lcd21-ble/partitions.bin",
+              "path": "firmware/16/screen-lcd21-ble/partitions.bin",
               "offset": "0x8000",
               "size": 3072,
               "md5": "e35927aef5a41f0c06034a1a8ca04462",
@@ -131,15 +131,15 @@
             },
             {
               "what": "app",
-              "path": "firmware/15/screen-lcd21-ble/screen-lcd21-ble-build15.bin",
+              "path": "firmware/16/screen-lcd21-ble/screen-lcd21-ble-build16.bin",
               "offset": "0x10000",
-              "size": 1380160,
-              "md5": "1b64fa8885d4d8eca5e31317eb8329a8",
-              "sha256": "6c9232dd81ef85ce479b4cc8fec8b27576d45991416fdc89959649b6e3f6be7c"
+              "size": 1380896,
+              "md5": "f869c6a451c2698b5df556ba19e5a375",
+              "sha256": "c7dce4d66ba4e0b0053ae688758a3432ef1b81c7ba6abae8a0c0860940f71429"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-lcd21-ble/bootclip.bin",
+              "path": "firmware/16/screen-lcd21-ble/bootclip.bin",
               "offset": "0x710000",
               "size": 2762997,
               "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
@@ -151,7 +151,7 @@
         },
         "screen-lcd28c": {
           "sourceRepo": null,
-          "sourceCommit": "b79894757581dd178f705e28beaab9fcc9b1546b",
+          "sourceCommit": "576912415391baf8e207a1e8ce94fa11d2c08f98",
           "partitionTable": {
             "offset": "0x8000",
             "size": 3072,
@@ -167,15 +167,15 @@
           "update": [
             {
               "what": "app",
-              "path": "firmware/15/screen-lcd28c/screen-lcd28c-build15.bin",
+              "path": "firmware/16/screen-lcd28c/screen-lcd28c-build16.bin",
               "offset": "0x10000",
-              "size": 1240784,
-              "md5": "24f698e7db27ecc2f0abe0db8f1dceb9",
-              "sha256": "94bb441f7a6a8605dfdb23e8a3fa7e92e30828d4f23e221d2626774b2dc5f7a2"
+              "size": 1241360,
+              "md5": "1f3a76d2a5d23c7d08718e564c111a5f",
+              "sha256": "c9fe06e3b1fdf72ecab99da512389801b0ef983b14d29fbc5b679b612adbce6a"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-lcd28c/bootclip.bin",
+              "path": "firmware/16/screen-lcd28c/bootclip.bin",
               "offset": "0x710000",
               "size": 2762997,
               "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
@@ -185,7 +185,7 @@
           "fresh": [
             {
               "what": "bootloader",
-              "path": "firmware/15/screen-lcd28c/bootloader.bin",
+              "path": "firmware/16/screen-lcd28c/bootloader.bin",
               "offset": "0x0",
               "size": 22288,
               "md5": "b20dad2ec1207b897339bf74f7b9952a",
@@ -193,7 +193,7 @@
             },
             {
               "what": "partitions",
-              "path": "firmware/15/screen-lcd28c/partitions.bin",
+              "path": "firmware/16/screen-lcd28c/partitions.bin",
               "offset": "0x8000",
               "size": 3072,
               "md5": "e35927aef5a41f0c06034a1a8ca04462",
@@ -201,15 +201,15 @@
             },
             {
               "what": "app",
-              "path": "firmware/15/screen-lcd28c/screen-lcd28c-build15.bin",
+              "path": "firmware/16/screen-lcd28c/screen-lcd28c-build16.bin",
               "offset": "0x10000",
-              "size": 1240784,
-              "md5": "24f698e7db27ecc2f0abe0db8f1dceb9",
-              "sha256": "94bb441f7a6a8605dfdb23e8a3fa7e92e30828d4f23e221d2626774b2dc5f7a2"
+              "size": 1241360,
+              "md5": "1f3a76d2a5d23c7d08718e564c111a5f",
+              "sha256": "c9fe06e3b1fdf72ecab99da512389801b0ef983b14d29fbc5b679b612adbce6a"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-lcd28c/bootclip.bin",
+              "path": "firmware/16/screen-lcd28c/bootclip.bin",
               "offset": "0x710000",
               "size": 2762997,
               "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
@@ -221,7 +221,7 @@
         },
         "screen-amoled175": {
           "sourceRepo": null,
-          "sourceCommit": "b79894757581dd178f705e28beaab9fcc9b1546b",
+          "sourceCommit": "576912415391baf8e207a1e8ce94fa11d2c08f98",
           "partitionTable": {
             "offset": "0x8000",
             "size": 3072,
@@ -237,15 +237,15 @@
           "update": [
             {
               "what": "app",
-              "path": "firmware/15/screen-amoled175/screen-amoled175-build15.bin",
+              "path": "firmware/16/screen-amoled175/screen-amoled175-build16.bin",
               "offset": "0x10000",
-              "size": 1238880,
-              "md5": "d439574a5f448d2724d0788f2f936fdd",
-              "sha256": "2b274f3b520dd82522d9d81ebeaab1ec2e09bc56d5e12509d63e830ad555ac54"
+              "size": 1239472,
+              "md5": "cdce7f0f7e264e329562357f8cd9320a",
+              "sha256": "a2725237e0e2b729164976c107aabe98a20a1584afed8658d8c46f16ff21ba87"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-amoled175/bootclip.bin",
+              "path": "firmware/16/screen-amoled175/bootclip.bin",
               "offset": "0x710000",
               "size": 16,
               "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
@@ -255,7 +255,7 @@
           "fresh": [
             {
               "what": "bootloader",
-              "path": "firmware/15/screen-amoled175/bootloader.bin",
+              "path": "firmware/16/screen-amoled175/bootloader.bin",
               "offset": "0x0",
               "size": 22272,
               "md5": "c0b8d3ffe083ae7816d754c22fe60dd9",
@@ -263,7 +263,7 @@
             },
             {
               "what": "partitions",
-              "path": "firmware/15/screen-amoled175/partitions.bin",
+              "path": "firmware/16/screen-amoled175/partitions.bin",
               "offset": "0x8000",
               "size": 3072,
               "md5": "e35927aef5a41f0c06034a1a8ca04462",
@@ -271,15 +271,15 @@
             },
             {
               "what": "app",
-              "path": "firmware/15/screen-amoled175/screen-amoled175-build15.bin",
+              "path": "firmware/16/screen-amoled175/screen-amoled175-build16.bin",
               "offset": "0x10000",
-              "size": 1238880,
-              "md5": "d439574a5f448d2724d0788f2f936fdd",
-              "sha256": "2b274f3b520dd82522d9d81ebeaab1ec2e09bc56d5e12509d63e830ad555ac54"
+              "size": 1239472,
+              "md5": "cdce7f0f7e264e329562357f8cd9320a",
+              "sha256": "a2725237e0e2b729164976c107aabe98a20a1584afed8658d8c46f16ff21ba87"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-amoled175/bootclip.bin",
+              "path": "firmware/16/screen-amoled175/bootclip.bin",
               "offset": "0x710000",
               "size": 16,
               "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
@@ -291,7 +291,7 @@
         },
         "screen-amoled241": {
           "sourceRepo": null,
-          "sourceCommit": "b79894757581dd178f705e28beaab9fcc9b1546b",
+          "sourceCommit": "576912415391baf8e207a1e8ce94fa11d2c08f98",
           "partitionTable": {
             "offset": "0x8000",
             "size": 3072,
@@ -307,15 +307,15 @@
           "update": [
             {
               "what": "app",
-              "path": "firmware/15/screen-amoled241/screen-amoled241-build15.bin",
+              "path": "firmware/16/screen-amoled241/screen-amoled241-build16.bin",
               "offset": "0x10000",
-              "size": 1228896,
-              "md5": "aaea99a8e8f57aea15b5177f244695e2",
-              "sha256": "382333dbbd9fdf76c0422a9a8cfb6d1a5b54a992665ef81e42e97b023dc2e652"
+              "size": 1229456,
+              "md5": "7f5e0387c113aa40e89e95cd87e56807",
+              "sha256": "6cb7e2a5d65aa4e5fc3b36dd3e07bfae9905f0ea34c641d8df73a5dbbb1a343c"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-amoled241/bootclip.bin",
+              "path": "firmware/16/screen-amoled241/bootclip.bin",
               "offset": "0x710000",
               "size": 16,
               "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
@@ -325,7 +325,7 @@
           "fresh": [
             {
               "what": "bootloader",
-              "path": "firmware/15/screen-amoled241/bootloader.bin",
+              "path": "firmware/16/screen-amoled241/bootloader.bin",
               "offset": "0x0",
               "size": 22272,
               "md5": "c1cff68f9b54c6077d25f05e04ca88e4",
@@ -333,7 +333,7 @@
             },
             {
               "what": "partitions",
-              "path": "firmware/15/screen-amoled241/partitions.bin",
+              "path": "firmware/16/screen-amoled241/partitions.bin",
               "offset": "0x8000",
               "size": 3072,
               "md5": "e35927aef5a41f0c06034a1a8ca04462",
@@ -341,15 +341,15 @@
             },
             {
               "what": "app",
-              "path": "firmware/15/screen-amoled241/screen-amoled241-build15.bin",
+              "path": "firmware/16/screen-amoled241/screen-amoled241-build16.bin",
               "offset": "0x10000",
-              "size": 1228896,
-              "md5": "aaea99a8e8f57aea15b5177f244695e2",
-              "sha256": "382333dbbd9fdf76c0422a9a8cfb6d1a5b54a992665ef81e42e97b023dc2e652"
+              "size": 1229456,
+              "md5": "7f5e0387c113aa40e89e95cd87e56807",
+              "sha256": "6cb7e2a5d65aa4e5fc3b36dd3e07bfae9905f0ea34c641d8df73a5dbbb1a343c"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-amoled241/bootclip.bin",
+              "path": "firmware/16/screen-amoled241/bootclip.bin",
               "offset": "0x710000",
               "size": 16,
               "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
@@ -361,7 +361,7 @@
         },
         "screen-amoled241v1": {
           "sourceRepo": null,
-          "sourceCommit": "b79894757581dd178f705e28beaab9fcc9b1546b",
+          "sourceCommit": "576912415391baf8e207a1e8ce94fa11d2c08f98",
           "partitionTable": {
             "offset": "0x8000",
             "size": 3072,
@@ -377,15 +377,15 @@
           "update": [
             {
               "what": "app",
-              "path": "firmware/15/screen-amoled241v1/screen-amoled241v1-build15.bin",
+              "path": "firmware/16/screen-amoled241v1/screen-amoled241v1-build16.bin",
               "offset": "0x10000",
-              "size": 1228384,
-              "md5": "513e68277e59019db968b3ba94a62fd4",
-              "sha256": "18fe33c722b64483fa310bb1bc26d155d231f77b4b77f4dd89cb03c1235aa72c"
+              "size": 1228912,
+              "md5": "07ac97ab440ac32fe288a7415d0887d8",
+              "sha256": "ad7444b7f1fae9f03949f978e7771b22dcfa03bf104e48af0866d63ed1e003dc"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-amoled241v1/bootclip.bin",
+              "path": "firmware/16/screen-amoled241v1/bootclip.bin",
               "offset": "0x710000",
               "size": 16,
               "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
@@ -395,7 +395,7 @@
           "fresh": [
             {
               "what": "bootloader",
-              "path": "firmware/15/screen-amoled241v1/bootloader.bin",
+              "path": "firmware/16/screen-amoled241v1/bootloader.bin",
               "offset": "0x0",
               "size": 22272,
               "md5": "04646b5fa09bfe8513cbead53d692f49",
@@ -403,7 +403,7 @@
             },
             {
               "what": "partitions",
-              "path": "firmware/15/screen-amoled241v1/partitions.bin",
+              "path": "firmware/16/screen-amoled241v1/partitions.bin",
               "offset": "0x8000",
               "size": 3072,
               "md5": "e35927aef5a41f0c06034a1a8ca04462",
@@ -411,15 +411,15 @@
             },
             {
               "what": "app",
-              "path": "firmware/15/screen-amoled241v1/screen-amoled241v1-build15.bin",
+              "path": "firmware/16/screen-amoled241v1/screen-amoled241v1-build16.bin",
               "offset": "0x10000",
-              "size": 1228384,
-              "md5": "513e68277e59019db968b3ba94a62fd4",
-              "sha256": "18fe33c722b64483fa310bb1bc26d155d231f77b4b77f4dd89cb03c1235aa72c"
+              "size": 1228912,
+              "md5": "07ac97ab440ac32fe288a7415d0887d8",
+              "sha256": "ad7444b7f1fae9f03949f978e7771b22dcfa03bf104e48af0866d63ed1e003dc"
             },
             {
               "what": "bootclip",
-              "path": "firmware/15/screen-amoled241v1/bootclip.bin",
+              "path": "firmware/16/screen-amoled241v1/bootclip.bin",
               "offset": "0x710000",
               "size": 16,
               "md5": "8d79cbc9a4ecdde112fc91ba625b13c2",
