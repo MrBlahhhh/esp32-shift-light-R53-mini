@@ -9,3 +9,4 @@ android/
 
 # Made by a PlatformIO run that passed "~" through unexpanded.
 /~/
+__pycache__/
