@@ -32,12 +32,14 @@ PAGE_FILES = ["index.html", "flasher.js", "style.css"]
 BRIDGE_DIR = "firmware/esp32_shiftlight_wideband"
 SCREEN_DIR = "screen"
 BRIDGE_ENVS = ["xiao_esp32s3", "xiao_esp32s3_lcd"]
-SCREEN_ENVS = ["screen-lcd21", "screen-lcd28c", "screen-amoled175", "screen-amoled241", "screen-amoled241v1"]
+SCREEN_ENVS = ["screen-lcd21", "screen-lcd21-ble", "screen-lcd28c", "screen-amoled175", "screen-amoled241",
+               "screen-amoled241v1"]
 # Source that goes into an image; anything uncommitted here and the build's commit would lie.
 SOURCE_PATHS = [f"{BRIDGE_DIR}/src", f"{BRIDGE_DIR}/include", f"{BRIDGE_DIR}/lib", f"{BRIDGE_DIR}/platformio.ini",
                 f"{SCREEN_DIR}/src", f"{SCREEN_DIR}/platformio.ini", f"{SCREEN_DIR}/CMakeLists.txt",
                 f"{SCREEN_DIR}/partitions.csv", f"{SCREEN_DIR}/sdkconfig.defaults",
                 f"{SCREEN_DIR}/sdkconfig.lcd.defaults", f"{SCREEN_DIR}/sdkconfig.amoled.defaults",
+                f"{SCREEN_DIR}/sdkconfig.ble.defaults",
                 f"{SCREEN_DIR}/bootclip.py", f"{SCREEN_DIR}/boot", "shared"]
 ESP32S3_CHIP_ID = 9
 APP_DESC_MAGIC = 0xABCD5432
@@ -104,9 +106,20 @@ def main():
     ap.add_argument("--date", default=datetime.date.today().isoformat())
     ap.add_argument("--no-build", action="store_true", help="use the images already built")
     ap.add_argument("--no-screens", action="store_true", help="the bridge only")
+    # A release can carry any set of boards (build 9 was the C3 alone, build 10 the bridge alone);
+    # Connect offers each board the newest release that has it. So one new build can go out
+    # without republishing the others, e.g. a screen before the bridge build beside it is proven.
+    ap.add_argument("--only", nargs="+", metavar="ENV", help="publish just these envs")
     args = ap.parse_args()
     repo, site = args.repo.expanduser().resolve(), args.site.expanduser().resolve()
+    bridges = BRIDGE_ENVS
     screens = [] if args.no_screens else SCREEN_ENVS
+    if args.only:
+        unknown = [env for env in args.only if env not in BRIDGE_ENVS + SCREEN_ENVS]
+        if unknown:
+            fail(f"not an env this publishes: {', '.join(unknown)}")
+        bridges = [env for env in BRIDGE_ENVS if env in args.only]
+        screens = [env for env in SCREEN_ENVS if env in args.only]
 
     dirty = git(repo, "status", "--porcelain", "--", *SOURCE_PATHS)
     if dirty:
@@ -116,7 +129,8 @@ def main():
     firmware_build = int(re.search(r"#define\s+CAPS_FIRMWARE_BUILD\s+(\d+)", main_cpp).group(1))
 
     if not args.no_build:
-        subprocess.run([pio(), "run", *sum((["-e", env] for env in BRIDGE_ENVS), [])], cwd=repo / BRIDGE_DIR, check=True)
+        if bridges:
+            subprocess.run([pio(), "run", *sum((["-e", env] for env in bridges), [])], cwd=repo / BRIDGE_DIR, check=True)
         if screens:
             subprocess.run([pio(), "run", *sum((["-e", env] for env in screens), [])], cwd=repo / SCREEN_DIR, check=True)
 
@@ -130,7 +144,7 @@ def main():
     boot_app0 = Path.home() / ".platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"
 
     boards = {}
-    for env in BRIDGE_ENVS + screens:
+    for env in bridges + screens:
         is_screen = env in SCREEN_ENVS
         built = repo / (SCREEN_DIR if is_screen else BRIDGE_DIR) / ".pio/build" / env
         dest = out / env
