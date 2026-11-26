@@ -73,6 +73,15 @@ const BOARDS = {
   // already on it.
   "screen-lcd21": screenBoard("Waveshare 2.1in round LCD", "ESP32-S3-Touch-LCD-2.1", "round",
     "480 round IPS with touch, the methanol controller's screen. Either USB-C flashes it."),
+  // The 2.1 again, as a Bluetooth central to the R53 Shift Light C3 board (screen-lcd21-ble),
+  // which has no USB host to drive it by cable. Connect tells it from the wired 2.1 build by the
+  // firmware on it, like the other screens.
+  "screen-lcd21-ble": {
+    ...screenBoard("Waveshare 2.1in round LCD, Bluetooth", "ESP32-S3-Touch-LCD-2.1", "round",
+      "The 2.1 for the R53 Shift Light C3 board, over Bluetooth with no cable: RPM, coolant, throttle, speed, fuel, an AEM wideband, and boost and timing from a DME with the CAN broadcast patch."),
+    ledText: "the screen lights up and says Searching",
+    freshText: "It plays its boot animation, then pairs with the nearest R53 Shift Light C3 board it hears and keeps it. To pair with another one: Display page, hold the shift light line.",
+  },
   "screen-lcd28c": screenBoard("Waveshare 2.8in round LCD", "ESP32-S3-Touch-LCD-2.8C", "round",
     "480 round IPS with touch. Either USB-C flashes it."),
   "screen-amoled175": screenBoard("Waveshare 1.75in round AMOLED", "ESP32-S3-Touch-AMOLED-1.75", "round",

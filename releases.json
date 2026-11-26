@@ -3,6 +3,85 @@
   "sourceRepo": "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini",
   "releases": [
     {
+      "build": 13,
+      "date": "2026-11-26",
+      "bench": false,
+      "notes": "Dash screen for the R53 Shift Light C3 board: the 2.1in round LCD over Bluetooth, no cable (pick 2.1in round LCD, Bluetooth). RPM, coolant, throttle, speed, fuel, an AEM wideband, and boost, timing, knock and IAT from a DME with the CAN broadcast patch. The C3 board needs no new firmware; the screen pairs with the nearest one.",
+      "sourceCommit": null,
+      "boards": {
+        "screen-lcd21-ble": {
+          "sourceRepo": null,
+          "sourceCommit": "a004e14f12431b5cb4d45c6ee4687e2e91669503",
+          "partitionTable": {
+            "offset": "0x8000",
+            "size": 3072,
+            "md5": "e35927aef5a41f0c06034a1a8ca04462"
+          },
+          "partitions": {
+            "nvs": "0x9000",
+            "phy_init": "0xf000",
+            "factory": "0x10000",
+            "bootclip": "0x710000"
+          },
+          "screenVersion": "0.1.1",
+          "update": [
+            {
+              "what": "app",
+              "path": "firmware/13/screen-lcd21-ble/screen-lcd21-ble-build13.bin",
+              "offset": "0x10000",
+              "size": 1477856,
+              "md5": "2f80aca3e88024ebf104eb4bbcd74734",
+              "sha256": "b47adfb2e4553447ff8f3ed5d5f10e5a12337ba2abef976d108a146dc0c45234"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/13/screen-lcd21-ble/bootclip.bin",
+              "offset": "0x710000",
+              "size": 2762997,
+              "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
+              "sha256": "f916c27462d8270157e981a305606bcb9626c84480b978ec474eefed3e5af176"
+            }
+          ],
+          "fresh": [
+            {
+              "what": "bootloader",
+              "path": "firmware/13/screen-lcd21-ble/bootloader.bin",
+              "offset": "0x0",
+              "size": 22288,
+              "md5": "134ec35735f0d8d71377cfbf394619f8",
+              "sha256": "34d3bd9677161f5f6191e7ccb1edd9ed1ba894bddc928930bcf727933b36fadf"
+            },
+            {
+              "what": "partitions",
+              "path": "firmware/13/screen-lcd21-ble/partitions.bin",
+              "offset": "0x8000",
+              "size": 3072,
+              "md5": "e35927aef5a41f0c06034a1a8ca04462",
+              "sha256": "5b23642c6ede45c3602c23409918b3cda937e683ace36f20b3f182cc29c203a9"
+            },
+            {
+              "what": "app",
+              "path": "firmware/13/screen-lcd21-ble/screen-lcd21-ble-build13.bin",
+              "offset": "0x10000",
+              "size": 1477856,
+              "md5": "2f80aca3e88024ebf104eb4bbcd74734",
+              "sha256": "b47adfb2e4553447ff8f3ed5d5f10e5a12337ba2abef976d108a146dc0c45234"
+            },
+            {
+              "what": "bootclip",
+              "path": "firmware/13/screen-lcd21-ble/bootclip.bin",
+              "offset": "0x710000",
+              "size": 2762997,
+              "md5": "aef43122eea9d8790a3a9a2db7b9ffef",
+              "sha256": "f916c27462d8270157e981a305606bcb9626c84480b978ec474eefed3e5af176"
+            }
+          ],
+          "bootClip": true,
+          "ota": null
+        }
+      }
+    },
+    {
       "build": 12,
       "date": "2026-11-20",
       "bench": false,
