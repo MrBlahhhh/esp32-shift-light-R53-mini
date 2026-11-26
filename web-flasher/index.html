@@ -53,6 +53,10 @@
             <input type="checkbox" id="variant-screen">
             <span>This board drives a dash screen <span class="note">(the screen build: the XIAO's USB-C goes to the screen)</span></span>
           </label>
+          <label class="variant" id="variant-ble-row" hidden>
+            <input type="checkbox" id="variant-ble">
+            <span>This screen pairs with a C3 board over Bluetooth <span class="note">(for the R53 Shift Light C3 board, no cable)</span></span>
+          </label>
           <p class="chip-line" id="chip-line" hidden></p>
           <p class="note" id="layout-line" hidden></p>
           <p class="note note-bad" id="device-error" hidden></p>
@@ -93,7 +97,7 @@
         <p><strong>R53 Shift Light K-line + CAN board.</strong> Rev C, with a Seeed XIAO ESP32-S3 soldered flat, USB-C over the top edge. Plug the cable into the XIAO, with the 12 V disconnected: power it from USB or 12 V, never both.</p>
         <p><strong>With a dash screen.</strong> The same board takes a second build, which drives a Waveshare touchscreen plugged into the XIAO's USB-C. Tick <strong>This board drives a dash screen</strong> after Connect to flash it. In that build the USB-C belongs to the screen, so to flash the board again, hold <strong>BOOT</strong> on the XIAO while you plug it into the computer.</p>
         <p><strong>Dash screens.</strong> The Waveshare ESP32-S3 2.1in and 2.8in round LCDs, the 1.75in round AMOLED and the 2.41in AMOLED. Flash the screen on its own, unplugged from the bridge. They all have the same chip, so the first time the page asks which one it is; after that it knows from the firmware. Not sure whether a 2.41 is the V1 or V2 board: flash the V2 build, and if the screen stays dark, the V1.</p>
-        <p><strong>A dash screen for the C3 board.</strong> The R53 Shift Light C3 board can't drive a screen through a cable, so the 2.1 has a Bluetooth build for it: pick <strong>2.1in round LCD, Bluetooth</strong>. Power the screen from any USB supply; it pairs with the nearest C3 board by itself, and the C3 board needs no new firmware.</p>
+        <p><strong>A dash screen for the C3 board.</strong> The R53 Shift Light C3 board can't drive a screen through a cable, so the 2.1 has a Bluetooth build for it: after Connect, tick <strong>This screen pairs with a C3 board over Bluetooth</strong> (or pick <strong>2.1in round LCD, Bluetooth</strong> under "I know what this is"). Power the screen from any USB supply; it pairs with the nearest C3 board by itself, and the C3 board needs no new firmware.</p>
         <p>The page reads the chip, picks the build itself, and tells you which build the board is already running. Flash it on the bench, disconnected from the car.</p>
       </div>
 

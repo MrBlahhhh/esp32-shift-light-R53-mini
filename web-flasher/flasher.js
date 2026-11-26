@@ -110,6 +110,11 @@ function screenBoard(title, module, shape, blurb) {
 }
 
 const SCREEN_KEYS = Object.keys(BOARDS).filter((key) => BOARDS[key].family === "screen");
+// The same hardware, two builds: each board's other one, switched with the box under the board.
+const SIBLING = {
+  "xiao_esp32s3": "xiao_esp32s3_lcd", "xiao_esp32s3_lcd": "xiao_esp32s3",
+  "screen-lcd21": "screen-lcd21-ble", "screen-lcd21-ble": "screen-lcd21",
+};
 // The firmware a board key is a build of, so a variant counts as its chip's board.
 const baseOf = (key) => (key && BOARDS[key] && BOARDS[key].variantOf) || key;
 
@@ -740,6 +745,11 @@ function render() {
   const isBridge = !!board && board.family === "bridge";
   $("variant-row").hidden = !isBridge;
   if (isBridge) $("variant-screen").checked = state.boardKey === "xiao_esp32s3_lcd";
+  // The 2.1 takes the K-line + CAN board's wired build or the C3 board's Bluetooth one. Connect
+  // knows which is on it from the firmware; this box switches what gets written.
+  const isLcd21 = state.boardKey === "screen-lcd21" || state.boardKey === "screen-lcd21-ble";
+  $("variant-ble-row").hidden = !isLcd21;
+  if (isLcd21) $("variant-ble").checked = state.boardKey === "screen-lcd21-ble";
   $("chip-line").hidden = !state.chip;
   if (state.chip) $("chip-line").textContent = `${chipText(state.chip)} · ${state.chip.mac}`;
   const layout = layoutOnBoard();
@@ -777,7 +787,10 @@ function render() {
         : `Source: commit ${commit.slice(0, 7)}, in a private repo.`;
     $("release-source").innerHTML = sourceHtml;
     if (board && !release.boards[state.boardKey]) {
-      $("release-detail").textContent += ` Not built for the ${board.name.toLowerCase()}.`;
+      const sibling = SIBLING[state.boardKey];
+      $("release-detail").textContent += sibling && release.boards[sibling]
+        ? ` This build is for the ${BOARDS[sibling].name.toLowerCase()}: tick the box under the board to flash it.`
+        : ` Not built for the ${board.name.toLowerCase()}.`;
     }
   }
 
@@ -839,6 +852,11 @@ function init() {
   $("btn-manual").addEventListener("click", () => openDevicePicker());
   $("variant-screen").addEventListener("change", (event) => {
     state.boardKey = event.target.checked ? "xiao_esp32s3_lcd" : "xiao_esp32s3";
+    selectReleaseFor(state.boardKey);
+    render();
+  });
+  $("variant-ble").addEventListener("change", (event) => {
+    state.boardKey = event.target.checked ? "screen-lcd21-ble" : "screen-lcd21";
     selectReleaseFor(state.boardKey);
     render();
   });
