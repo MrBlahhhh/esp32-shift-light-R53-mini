@@ -3,6 +3,157 @@
   "sourceRepo": "https://github.com/MrBlahhhh/esp32-shift-light-R53-mini",
   "releases": [
     {
+      "build": 17,
+      "date": "2026-11-26",
+      "bench": false,
+      "notes": "K-line + CAN bridge firmware 387. With a DME carrying the CAN broadcast patch it reads boost, timing, knock, IAT and the rest off CAN into the SD log and the dash screen, and leaves the K-line alone while the broadcast arrives. Sends the dash lights' level to the dash screen (Dim with dash lights). A program write goes on when the ECU's program isn't the backup's and says so, and reads back only the signature at the end. Update keeps your settings.",
+      "sourceCommit": null,
+      "boards": {
+        "xiao_esp32s3": {
+          "sourceRepo": null,
+          "sourceCommit": "5350cd136976eb337449b04bee77971b31fb967d",
+          "partitionTable": {
+            "offset": "0x8000",
+            "size": 3072,
+            "md5": "801ba71678a964614657a6d8fbc6baca"
+          },
+          "partitions": {
+            "nvs": "0x9000",
+            "otadata": "0xe000",
+            "app0": "0x10000",
+            "app1": "0x340000",
+            "spiffs": "0x670000",
+            "coredump": "0x7f0000"
+          },
+          "firmwareBuild": 387,
+          "update": [
+            {
+              "what": "app",
+              "path": "firmware/17/xiao_esp32s3/bridge-xiao_esp32s3-build17.bin",
+              "offset": "0x10000",
+              "size": 890224,
+              "md5": "4ee825afe1580f7a469c82a30ed7d632",
+              "sha256": "91d1273462e51df6225f00462cb506e3d09a0742238effad8346d28b1b9151eb"
+            },
+            {
+              "what": "otadata",
+              "path": "firmware/17/xiao_esp32s3/boot_app0.bin",
+              "offset": "0xe000",
+              "size": 8192,
+              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
+              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+            }
+          ],
+          "fresh": [
+            {
+              "what": "bootloader",
+              "path": "firmware/17/xiao_esp32s3/bootloader.bin",
+              "offset": "0x0",
+              "size": 19984,
+              "md5": "25fa99f15c4941a552b5a83656cbdb53",
+              "sha256": "11e0d446204ff66d7fa903f50b3db73d07ac4b504832e2a7435f2d55b6d3d588"
+            },
+            {
+              "what": "partitions",
+              "path": "firmware/17/xiao_esp32s3/partitions.bin",
+              "offset": "0x8000",
+              "size": 3072,
+              "md5": "801ba71678a964614657a6d8fbc6baca",
+              "sha256": "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c"
+            },
+            {
+              "what": "otadata",
+              "path": "firmware/17/xiao_esp32s3/boot_app0.bin",
+              "offset": "0xe000",
+              "size": 8192,
+              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
+              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+            },
+            {
+              "what": "app",
+              "path": "firmware/17/xiao_esp32s3/bridge-xiao_esp32s3-build17.bin",
+              "offset": "0x10000",
+              "size": 890224,
+              "md5": "4ee825afe1580f7a469c82a30ed7d632",
+              "sha256": "91d1273462e51df6225f00462cb506e3d09a0742238effad8346d28b1b9151eb"
+            }
+          ],
+          "ota": null
+        },
+        "xiao_esp32s3_lcd": {
+          "sourceRepo": null,
+          "sourceCommit": "5350cd136976eb337449b04bee77971b31fb967d",
+          "partitionTable": {
+            "offset": "0x8000",
+            "size": 3072,
+            "md5": "801ba71678a964614657a6d8fbc6baca"
+          },
+          "partitions": {
+            "nvs": "0x9000",
+            "otadata": "0xe000",
+            "app0": "0x10000",
+            "app1": "0x340000",
+            "spiffs": "0x670000",
+            "coredump": "0x7f0000"
+          },
+          "firmwareBuild": 387,
+          "update": [
+            {
+              "what": "app",
+              "path": "firmware/17/xiao_esp32s3_lcd/bridge-xiao_esp32s3_lcd-build17.bin",
+              "offset": "0x10000",
+              "size": 963392,
+              "md5": "7fd6ce8d15df3be664285d0fb79d7b86",
+              "sha256": "e3335987c440848b60622ef0ccdd6378898348b7023f40f53f105294ceb0f22a"
+            },
+            {
+              "what": "otadata",
+              "path": "firmware/17/xiao_esp32s3_lcd/boot_app0.bin",
+              "offset": "0xe000",
+              "size": 8192,
+              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
+              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+            }
+          ],
+          "fresh": [
+            {
+              "what": "bootloader",
+              "path": "firmware/17/xiao_esp32s3_lcd/bootloader.bin",
+              "offset": "0x0",
+              "size": 19984,
+              "md5": "25fa99f15c4941a552b5a83656cbdb53",
+              "sha256": "11e0d446204ff66d7fa903f50b3db73d07ac4b504832e2a7435f2d55b6d3d588"
+            },
+            {
+              "what": "partitions",
+              "path": "firmware/17/xiao_esp32s3_lcd/partitions.bin",
+              "offset": "0x8000",
+              "size": 3072,
+              "md5": "801ba71678a964614657a6d8fbc6baca",
+              "sha256": "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c"
+            },
+            {
+              "what": "otadata",
+              "path": "firmware/17/xiao_esp32s3_lcd/boot_app0.bin",
+              "offset": "0xe000",
+              "size": 8192,
+              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
+              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+            },
+            {
+              "what": "app",
+              "path": "firmware/17/xiao_esp32s3_lcd/bridge-xiao_esp32s3_lcd-build17.bin",
+              "offset": "0x10000",
+              "size": 963392,
+              "md5": "7fd6ce8d15df3be664285d0fb79d7b86",
+              "sha256": "e3335987c440848b60622ef0ccdd6378898348b7023f40f53f105294ceb0f22a"
+            }
+          ],
+          "ota": null
+        }
+      }
+    },
+    {
       "build": 16,
       "date": "2026-11-26",
       "bench": false,
@@ -427,157 +578,6 @@
             }
           ],
           "bootClip": false,
-          "ota": null
-        }
-      }
-    },
-    {
-      "build": 12,
-      "date": "2026-11-20",
-      "bench": false,
-      "notes": "K-line + CAN bridge firmware 383 and dash screen 0.1.1. The screens now play a boot video with the car's name (2.1 and 2.8C; pick the name on the Display page), and the brightness slider no longer snaps back to 5 %. A screen on 0.1.0 needs a Fresh install once, for the boot video's space. The bridge takes firmware updates over Bluetooth from R53 Logger, and in the screen build passes the screen's updates through from the phone. Update keeps your settings.",
-      "sourceCommit": null,
-      "boards": {
-        "xiao_esp32s3": {
-          "sourceRepo": null,
-          "sourceCommit": "936103ba74e894431c292b94eb75e734d54085ed",
-          "partitionTable": {
-            "offset": "0x8000",
-            "size": 3072,
-            "md5": "801ba71678a964614657a6d8fbc6baca"
-          },
-          "partitions": {
-            "nvs": "0x9000",
-            "otadata": "0xe000",
-            "app0": "0x10000",
-            "app1": "0x340000",
-            "spiffs": "0x670000",
-            "coredump": "0x7f0000"
-          },
-          "firmwareBuild": 383,
-          "update": [
-            {
-              "what": "app",
-              "path": "firmware/12/xiao_esp32s3/bridge-xiao_esp32s3-build12.bin",
-              "offset": "0x10000",
-              "size": 887952,
-              "md5": "16f0d7bd05739c28a1cf4a8bf9ded96b",
-              "sha256": "c87bdacbe1c2ea72c239392589a75059f90322b275be140caad20555347c4ac3"
-            },
-            {
-              "what": "otadata",
-              "path": "firmware/12/xiao_esp32s3/boot_app0.bin",
-              "offset": "0xe000",
-              "size": 8192,
-              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
-              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
-            }
-          ],
-          "fresh": [
-            {
-              "what": "bootloader",
-              "path": "firmware/12/xiao_esp32s3/bootloader.bin",
-              "offset": "0x0",
-              "size": 19984,
-              "md5": "25fa99f15c4941a552b5a83656cbdb53",
-              "sha256": "11e0d446204ff66d7fa903f50b3db73d07ac4b504832e2a7435f2d55b6d3d588"
-            },
-            {
-              "what": "partitions",
-              "path": "firmware/12/xiao_esp32s3/partitions.bin",
-              "offset": "0x8000",
-              "size": 3072,
-              "md5": "801ba71678a964614657a6d8fbc6baca",
-              "sha256": "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c"
-            },
-            {
-              "what": "otadata",
-              "path": "firmware/12/xiao_esp32s3/boot_app0.bin",
-              "offset": "0xe000",
-              "size": 8192,
-              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
-              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
-            },
-            {
-              "what": "app",
-              "path": "firmware/12/xiao_esp32s3/bridge-xiao_esp32s3-build12.bin",
-              "offset": "0x10000",
-              "size": 887952,
-              "md5": "16f0d7bd05739c28a1cf4a8bf9ded96b",
-              "sha256": "c87bdacbe1c2ea72c239392589a75059f90322b275be140caad20555347c4ac3"
-            }
-          ],
-          "ota": null
-        },
-        "xiao_esp32s3_lcd": {
-          "sourceRepo": null,
-          "sourceCommit": "936103ba74e894431c292b94eb75e734d54085ed",
-          "partitionTable": {
-            "offset": "0x8000",
-            "size": 3072,
-            "md5": "801ba71678a964614657a6d8fbc6baca"
-          },
-          "partitions": {
-            "nvs": "0x9000",
-            "otadata": "0xe000",
-            "app0": "0x10000",
-            "app1": "0x340000",
-            "spiffs": "0x670000",
-            "coredump": "0x7f0000"
-          },
-          "firmwareBuild": 383,
-          "update": [
-            {
-              "what": "app",
-              "path": "firmware/12/xiao_esp32s3_lcd/bridge-xiao_esp32s3_lcd-build12.bin",
-              "offset": "0x10000",
-              "size": 961072,
-              "md5": "bc15779269bba90bb3bc6418b251c31a",
-              "sha256": "1865205be6d3930341d9738bea70b229438ffe52abb3ae2955183a3747ba1da1"
-            },
-            {
-              "what": "otadata",
-              "path": "firmware/12/xiao_esp32s3_lcd/boot_app0.bin",
-              "offset": "0xe000",
-              "size": 8192,
-              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
-              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
-            }
-          ],
-          "fresh": [
-            {
-              "what": "bootloader",
-              "path": "firmware/12/xiao_esp32s3_lcd/bootloader.bin",
-              "offset": "0x0",
-              "size": 19984,
-              "md5": "25fa99f15c4941a552b5a83656cbdb53",
-              "sha256": "11e0d446204ff66d7fa903f50b3db73d07ac4b504832e2a7435f2d55b6d3d588"
-            },
-            {
-              "what": "partitions",
-              "path": "firmware/12/xiao_esp32s3_lcd/partitions.bin",
-              "offset": "0x8000",
-              "size": 3072,
-              "md5": "801ba71678a964614657a6d8fbc6baca",
-              "sha256": "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c"
-            },
-            {
-              "what": "otadata",
-              "path": "firmware/12/xiao_esp32s3_lcd/boot_app0.bin",
-              "offset": "0xe000",
-              "size": 8192,
-              "md5": "e6327541e2dc394ca2c3b3280ac0f39f",
-              "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
-            },
-            {
-              "what": "app",
-              "path": "firmware/12/xiao_esp32s3_lcd/bridge-xiao_esp32s3_lcd-build12.bin",
-              "offset": "0x10000",
-              "size": 961072,
-              "md5": "bc15779269bba90bb3bc6418b251c31a",
-              "sha256": "1865205be6d3930341d9738bea70b229438ffe52abb3ae2955183a3747ba1da1"
-            }
-          ],
           "ota": null
         }
       }
